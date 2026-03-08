@@ -1,0 +1,6 @@
+node_modules/
+dist/
+lager.json
+katalog.csv
+*.exe
+.claude/
