@@ -422,7 +422,7 @@ function renderArtikelItem(a) {
         <div class="artikel-top">
           <span class="artikel-name">${escHtml(a.artikelname)}</span>
           ${a.artikelnummer ? `<span class="artikel-nummer">${escHtml(a.artikelnummer)}</span>` : ''}
-          <span class="badge-menge">${a.menge} ${escHtml(a.einheit)}</span>
+          <span class="badge-menge">${escHtml(a.einheit)}</span>
           ${!erledigt ? bestandBadge(a.artikelnummer) : ''}
         </div>
         <div class="artikel-meta">

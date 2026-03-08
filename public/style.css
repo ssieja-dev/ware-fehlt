@@ -360,10 +360,11 @@ main {
 }
 .erledigt .artikel-name { text-decoration: line-through; color: var(--text3); }
 .artikel-nummer {
-  font-size: .78rem; color: var(--text3);
+  font-size: .95rem; color: var(--text2);
   background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 4px; padding: .1rem .4rem;
-  font-family: monospace;
+  border-radius: 4px; padding: .1rem .45rem;
+  font-family: monospace; font-weight: 700;
+  letter-spacing: .02em;
 }
 .badge-bestand {
   font-size: .78rem; font-weight: 600;
@@ -390,7 +391,7 @@ main {
   display: flex; align-items: center; gap: .25rem;
 }
 .meta-item svg { width: 12px; height: 12px; flex-shrink: 0; }
-.meta-lagerort { color: var(--accent); font-weight: 500; }
+.meta-lagerort { color: var(--accent); font-weight: 700; font-size: .85rem; }
 .notiz-text {
   font-size: .8rem; color: var(--text2);
   background: rgba(59,130,246,.07);
