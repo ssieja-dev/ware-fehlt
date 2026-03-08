@@ -189,6 +189,21 @@ setInterval(ladeBestand, 5 * 60 * 1000);
 
 app.get('/api/lagerbestand', (req, res) => res.json(bestandMap));
 
+app.post('/api/lagerbestand/upload', (req, res) => {
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    try {
+      const buf = Buffer.concat(chunks);
+      fs.writeFileSync(BESTAND_FILE, buf);
+      ladeBestand();
+      res.json({ ok: true, artikel: Object.keys(bestandMap).length });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+});
+
 // Statistik
 app.get('/api/statistik', (req, res) => {
   const gesamt = db.artikel.length;
