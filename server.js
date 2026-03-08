@@ -137,7 +137,7 @@ function parseCSV(content) {
     const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
     const obj = {};
     headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
-    if (obj.artikelname) result.push(obj);
+    if (Object.values(obj).some(v => v)) result.push(obj);
   }
   return result;
 }
