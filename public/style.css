@@ -501,3 +501,23 @@ input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0 50px #fff inset;
   -webkit-text-fill-color: var(--text);
 }
+
+/* ── BESTAND-HINT IM FORMULAR ── */
+.bestand-hint {
+  margin-top: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.bestand-hint.hidden { display: none; }
+.bestand-hint-ok {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+.bestand-hint-leer {
+  background: #fff7ed;
+  color: var(--orange);
+  border: 1px solid #fed7aa;
+}

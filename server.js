@@ -128,7 +128,7 @@ function parseCSV(content) {
   const lines = content.split(/\r?\n/);
   if (lines.length === 0) return [];
   const header = lines[0];
-  const delimiter = header.includes(';') ? ';' : ',';
+  const delimiter = header.includes('\t') ? '\t' : header.includes(';') ? ';' : ',';
   const headers = header.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
   const result = [];
   for (let i = 1; i < lines.length; i++) {
@@ -171,7 +171,8 @@ function ladeBestand() {
     const neu = {};
     for (const e of eintraege) {
       const nr = (e.artikelnummer || e.artnr || e['artikel-nr'] || '').trim();
-      const raw = (e.bestand || e.lagerbestand || e.verfuegbar || e['verfügbar'] || '0').replace(',', '.');
+      const raw = (e.bestand || e.lagerbestand || e.verfuegbar || e['verfügbar'] ||
+        e['lagerbestand lager [im hasseldamm]'] || '0').replace(',', '.');
       const bestand = parseFloat(raw) || 0;
       if (nr) neu[nr] = bestand;
     }

@@ -423,7 +423,7 @@ function renderArtikelItem(a) {
           <span class="artikel-name">${escHtml(a.artikelname)}</span>
           ${a.artikelnummer ? `<span class="artikel-nummer">${escHtml(a.artikelnummer)}</span>` : ''}
           <span class="badge-menge">${a.menge} ${escHtml(a.einheit)}</span>
-          ${bestandBadge(a.artikelnummer)}
+          ${!erledigt ? bestandBadge(a.artikelnummer) : ''}
         </div>
         <div class="artikel-meta">
           <span class="meta-item meta-lagerort">${locIcon} ${escHtml(a.lagerort)}</span>
