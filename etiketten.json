@@ -15,7 +15,23 @@
       "status": "erledigt",
       "erledigt_von": "Derya",
       "erledigt_am": "2026-03-11T10:37:28.434Z"
+    },
+    {
+      "id": 20,
+      "artikel_id": 28,
+      "artikelname": "Kabanossi Würstchen aus 100% Hirsch für Hunde 500g",
+      "artikelnummer": "21-4829-002",
+      "lagerort": "F01-01-02",
+      "menge": "1",
+      "gemeldet_von": "Seba",
+      "typ": "mhd",
+      "lieferung": "",
+      "mhd": "",
+      "erstellt_am": "2026-03-11T11:04:58.516Z",
+      "status": "offen",
+      "erledigt_von": null,
+      "erledigt_am": null
     }
   ],
-  "nextId": 20
+  "nextId": 21
 }

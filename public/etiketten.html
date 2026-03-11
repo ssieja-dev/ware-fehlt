@@ -47,7 +47,8 @@
       font-size: .85rem; color: var(--text2);
     }
     .name-bar strong { color: var(--text); }
-    .name-bar button { margin-left: auto; font-size: .78rem; background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
+    .name-bar .name-bar-right { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+    .name-bar button { font-size: .78rem; background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
     .name-modal-simple { display: flex; flex-direction: column; gap: .75rem; }
     .mengen-stepper {
       display: flex; align-items: center; justify-content: center; gap: .6rem; margin: .5rem 0;
@@ -152,9 +153,11 @@
   </header>
 
   <div id="name-bar" class="name-bar hidden">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-    Angemeldet als <strong id="name-display"></strong>
-    <button onclick="changeName()">Ändern</button>
+    <div class="name-bar-right">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Angemeldet als <strong id="name-display"></strong>
+      <button onclick="changeName()">Ändern</button>
+    </div>
   </div>
 
   <div class="page-title">Etikettenaufträge</div>

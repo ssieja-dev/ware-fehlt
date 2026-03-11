@@ -371,6 +371,16 @@ async function submitArtikel() {
   if (!nummer) { shake(document.getElementById('f-nummer')); return; }
   if (!lagerort) { shake(document.getElementById('f-lagerort')); return; }
 
+  const duplikat = alleArtikel.find(a =>
+    (a.status === 'offen' || a.status === 'etiketten') &&
+    a.artikelnummer.toLowerCase() === nummer.toLowerCase()
+  );
+  if (duplikat) {
+    toast(`Bereits gemeldet: "${duplikat.artikelname}"`, 'error');
+    shake(document.getElementById('f-nummer'));
+    return;
+  }
+
   const payload = {
     artikelname: name,
     artikelnummer: document.getElementById('f-nummer').value.trim(),
