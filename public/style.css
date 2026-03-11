@@ -108,6 +108,10 @@ body {
   border: 1px solid var(--border); font-weight: 400;
 }
 .modal-box .btn-secondary:hover { background: var(--bg3); color: var(--text); }
+.modal-box .btn-danger {
+  background: var(--red); margin-bottom: .5rem;
+}
+.modal-box .btn-danger:hover { background: #dc2626; }
 
 /* ── HEADER ── */
 header {
@@ -372,9 +376,9 @@ main {
 }
 .erledigt .artikel-name { text-decoration: line-through; color: var(--text3); }
 .artikel-nummer {
-  font-size: .95rem; color: var(--text2);
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 4px; padding: .1rem .45rem;
+  font-size: 1.05rem;
+  color: #fff; background: #1e3a5f; border: none;
+  border-radius: 6px; padding: .2rem .6rem;
   font-family: monospace; font-weight: 700;
   letter-spacing: .02em;
 }
@@ -425,7 +429,7 @@ main {
 .erledigt-info svg { width: 12px; height: 12px; }
 
 .artikel-actions {
-  display: flex; align-items: center; gap: .3rem;
+  display: flex; align-items: center; gap: .5rem;
   flex-shrink: 0;
 }
 .action-btn {
@@ -436,8 +440,24 @@ main {
   transition: all .2s;
 }
 .action-btn:hover { border-color: var(--border); color: var(--text2); background: var(--bg3); }
-.action-btn.delete:hover { border-color: var(--red); color: var(--red); background: rgba(239,68,68,.1); }
-.action-btn.etikett:hover { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+.action-btn.delete { color: var(--red); border-color: #fca5a5; background: #fef2f2; }
+.action-btn.delete svg { width: 18px; height: 18px; }
+.action-btn.delete:hover { border-color: var(--red); color: #b91c1c; background: #fee2e2; }
+.action-btn.etikett { color: #ca8a04; border-color: #fde68a; background: #fefce8; }
+.action-btn.etikett svg { width: 18px; height: 18px; }
+.action-btn.etikett:hover { border-color: #f59e0b; color: #b45309; background: #fef3c7; }
+.etiketten-info {
+  display: flex; align-items: center; gap: .35rem;
+  font-size: .8rem; font-weight: 600; color: #2563eb;
+  margin-top: .3rem;
+}
+.etiketten-info svg { width: 13px; height: 13px; flex-shrink: 0; }
+.etiketten-fertig-info {
+  display: flex; align-items: center; gap: .35rem;
+  font-size: .8rem; font-weight: 600; color: var(--green);
+  margin-top: .3rem;
+}
+.etiketten-fertig-info svg { width: 13px; height: 13px; flex-shrink: 0; }
 .action-btn svg { width: 14px; height: 14px; }
 
 /* ── TOAST ── */
@@ -532,6 +552,63 @@ main {
   width: 100%; white-space: normal; word-break: break-word;
 }
 .anmerkung-badge svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: .15rem; stroke: #7c3aed; }
+
+/* ── ETIKETTEN-TOGGLE ── */
+.et-toggle {
+  display: flex; gap: .4rem; margin: .75rem 0 .4rem;
+  background: var(--bg3); border-radius: var(--radius-sm);
+  padding: .25rem;
+}
+.et-toggle-btn {
+  flex: 1; padding: .45rem .5rem; border: none; border-radius: 6px;
+  font-size: .85rem; font-weight: 500; cursor: pointer;
+  background: transparent; color: var(--text2); transition: all .15s;
+}
+.et-toggle-btn.active {
+  background: var(--green); color: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15); font-weight: 600;
+}
+.et-feld input { width: 100%; }
+.et-feld.hidden { display: none; }
+
+/* ── MENGEN-STEPPER ── */
+.mengen-stepper {
+  display: flex; align-items: center; justify-content: center;
+  gap: .6rem; margin: .5rem 0;
+}
+.stepper-btn {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: 2px solid var(--border2); background: var(--bg3);
+  font-size: 1.6rem; font-weight: 300; color: var(--text);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s; user-select: none;
+}
+.stepper-btn:active { transform: scale(.9); background: var(--border); }
+.stepper-wert {
+  min-width: 64px; text-align: center;
+  font-size: 2.4rem; font-weight: 700; color: var(--text);
+  line-height: 1;
+}
+.stepper-confirm {
+  width: 52px; height: 52px; border-radius: 50%;
+  border: none; background: var(--green); color: #fff;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .15s; margin-left: .4rem;
+}
+.stepper-confirm:active { transform: scale(.9); background: #15803d; }
+.stepper-confirm svg { width: 22px; height: 22px; }
+
+/* ── BESTAND INFOFELD ── */
+.bestand-info {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .6rem .9rem; border-radius: var(--radius-sm);
+  font-size: .9rem; font-weight: 600; margin-bottom: .5rem;
+}
+.bestand-info.leer   { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; }
+.bestand-info.niedrig { background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; }
+.bestand-info.ok     { background: #f0fdf4; border: 1px solid #86efac; color: #15803d; }
+.bestand-info svg { width: 16px; height: 16px; flex-shrink: 0; }
+.bestand-info.hidden { display: none; }
 
 /* ── ANMERKUNG INFOFELD ── */
 .anmerkung-info {

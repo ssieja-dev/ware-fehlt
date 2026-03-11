@@ -115,8 +115,21 @@ function waehlKatalogEintrag(k) {
   document.getElementById('f-nummer').value = k.artikelnummer || '';
   document.getElementById('f-lagerort').value = k.lagerort || '';
   zeigAnmerkung(k.anmerkung || '');
+  zeigBestandInfo(k.artikelnummer || '');
   versteckeKatalogDropdown();
   document.getElementById('f-notiz').focus();
+}
+
+function zeigBestandInfo(artikelnummer) {
+  const box = document.getElementById('bestand-info');
+  if (!artikelnummer || !(artikelnummer in lagerbestand)) {
+    box.classList.add('hidden'); return;
+  }
+  const b = lagerbestand[artikelnummer].bestand;
+  const warnIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+  const okIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+  box.className = 'bestand-info ' + (b === 0 ? 'leer' : b <= 3 ? 'niedrig' : 'ok');
+  box.innerHTML = `Bestand: <strong>${b}</strong>`;
 }
 
 function formatAnmerkung(text) {
@@ -147,6 +160,7 @@ function clearArtikelName() {
   document.getElementById('f-name-clear').classList.add('hidden');
   versteckeKatalogDropdown();
   zeigAnmerkung('');
+  document.getElementById('bestand-info').classList.add('hidden');
   fName.focus();
 }
 
@@ -260,6 +274,16 @@ socket.on('artikel_erledigt', artikel => {
 socket.on('artikel_offen', artikel => {
   updateArtikelInListe(artikel);
   ladeStatistik();
+});
+socket.on('artikel_etiketten', artikel => {
+  updateArtikelInListe(artikel);
+  ladeStatistik();
+});
+socket.on('artikel_etiketten_fertig', artikel => {
+  updateArtikelInListe(artikel);
+  ladeStatistik();
+  toast(`Etiketten fertig: ${artikel.artikelname}`, 'success');
+  spieleEtikettenFertigTon();
 });
 socket.on('lagerbestand_update', data => {
   lagerbestand = data;
@@ -414,28 +438,102 @@ async function markiereOffen(id) {
   }
 }
 
-async function loescheArtikel(id, name) {
-  if (!confirm(`"${name}" wirklich loeschen?`)) return;
+let pendingLoescheId = null;
+
+function loescheArtikel(id, name) {
+  pendingLoescheId = id;
+  document.getElementById('delete-modal-text').textContent = `"${name}" wird unwiderruflich gelöscht.`;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  pendingLoescheId = null;
+  document.getElementById('delete-modal').classList.add('hidden');
+}
+
+async function bestaetigeLoeschen() {
+  if (!pendingLoescheId) return;
+  const id = pendingLoescheId;
+  closeDeleteModal();
   try {
     const res = await fetch(`/api/artikel/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error();
-    toast(`"${name}" geloescht`, 'info');
+    toast('Artikel gelöscht', 'info');
   } catch {
-    toast('Fehler beim Loeschen', 'error');
+    toast('Fehler beim Löschen', 'error');
   }
+}
+
+// ── SIGNALTON LAGER ───────────────────────────────────────────
+let _audioCtx = null;
+function _initAudio() {
+  if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+}
+document.addEventListener('touchstart', _initAudio, { passive: true });
+document.addEventListener('click', _initAudio, { passive: true });
+
+function spieleEtikettenFertigTon() {
+  try {
+    _initAudio();
+    if (!_audioCtx || _audioCtx.state !== 'running') return;
+    const t = _audioCtx.currentTime;
+    [[660, 0], [880, 0.2], [1100, 0.4], [1320, 0.6]].forEach(([freq, delay]) => {
+      const osc = _audioCtx.createOscillator();
+      const gain = _audioCtx.createGain();
+      osc.connect(gain); gain.connect(_audioCtx.destination);
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t + delay);
+      gain.gain.linearRampToValueAtTime(0.45, t + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + delay + 0.22);
+      osc.start(t + delay); osc.stop(t + delay + 0.25);
+    });
+  } catch {}
 }
 
 // ── ETIKETTEN ────────────────────────────────────────────────
 let pendingEtikettenArtikel = null;
 
+let stepperWert = 1;
+let stepperInterval = null;
+
+function stepperAendern(delta) {
+  stepperWert = Math.max(1, stepperWert + delta);
+  document.getElementById('etiketten-menge-display').textContent = stepperWert;
+}
+
+function stepperStart(delta) {
+  stepperAendern(delta);
+  stepperInterval = setTimeout(() => {
+    stepperInterval = setInterval(() => stepperAendern(delta * 10), 100);
+  }, 500);
+}
+
+function stepperStop() {
+  clearTimeout(stepperInterval);
+  clearInterval(stepperInterval);
+  stepperInterval = null;
+}
+
 function openEtikettenModal(id) {
   pendingEtikettenArtikel = alleArtikel.find(a => a.id === id);
   if (!pendingEtikettenArtikel) return;
-  document.getElementById('etiketten-artikel-info').textContent =
-    `${pendingEtikettenArtikel.artikelname}${pendingEtikettenArtikel.artikelnummer ? ' · ' + pendingEtikettenArtikel.artikelnummer : ''}`;
-  document.getElementById('etiketten-menge').value = '';
+  const a2 = pendingEtikettenArtikel;
+  document.getElementById('etiketten-artikel-info').innerHTML =
+    `${escHtml(a2.artikelname)}${a2.artikelnummer ? '<br><span style="font-size:.85rem;color:#6b7280;font-weight:400;">' + escHtml(a2.artikelnummer) + '</span>' : ''}`;
+  stepperWert = 1;
+  document.getElementById('etiketten-menge-display').textContent = 1;
+  setEtikettenTyp('lieferung');
+  document.getElementById('etiketten-lieferung').value = '';
   document.getElementById('etiketten-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('etiketten-menge').focus(), 50);
+}
+
+let etikettenTyp = 'lieferung';
+function setEtikettenTyp(typ) {
+  etikettenTyp = typ;
+  document.getElementById('toggle-lieferung').classList.toggle('active', typ === 'lieferung');
+  document.getElementById('toggle-mhd').classList.toggle('active', typ === 'mhd');
+  document.getElementById('et-feld-lieferung').classList.toggle('hidden', typ !== 'lieferung');
 }
 
 function closeEtikettenModal() {
@@ -444,22 +542,29 @@ function closeEtikettenModal() {
 }
 
 async function bestaetigeEtiketten() {
-  const menge = document.getElementById('etiketten-menge').value.trim();
-  if (!menge) { shake(document.getElementById('etiketten-menge')); return; }
+  const menge = String(stepperWert);
   const a = pendingEtikettenArtikel;
   try {
     const res = await fetch('/api/etiketten', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        artikel_id: a.id,
         artikelname: a.artikelname,
         artikelnummer: a.artikelnummer,
         lagerort: a.lagerort,
         menge,
         gemeldet_von: userName,
+        typ: etikettenTyp,
+        lieferung: etikettenTyp === 'lieferung' ? document.getElementById('etiketten-lieferung').value.trim() : '',
       }),
     });
     if (!res.ok) throw new Error();
+    await fetch(`/api/artikel/${a.id}/etiketten`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ menge }),
+    });
     closeEtikettenModal();
     toast('Etikettenauftrag an Vertrieb gesendet', 'success');
   } catch {
@@ -516,6 +621,7 @@ function bestandBadge(artikelnummer) {
 
 function renderArtikelItem(a) {
   const erledigt = a.status === 'erledigt';
+  const hatEtiketten = a.status === 'etiketten';
   const erstelltDatum = formatDatum(a.erstellt_am);
   const erledigtDatum = a.erledigt_am ? formatDatum(a.erledigt_am) : '';
 
@@ -552,11 +658,13 @@ function renderArtikelItem(a) {
         </div>
         ${a.notiz ? `<div class="notiz-text">${escHtml(a.notiz)}</div>` : ''}
         ${(() => { const anm = getAnmerkung(a.artikelnummer); return anm ? `<div class="anmerkung-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>${formatAnmerkung(anm)}</span></div>` : ''; })()}
+        ${hatEtiketten ? `<div class="etiketten-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Etiketten bestellt${a.etiketten_menge ? ` &mdash; <strong>${escHtml(a.etiketten_menge)} Stk.</strong>` : ''}</div>` : ''}
+        ${a.etiketten_fertig ? `<div class="etiketten-fertig-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Etiketten fertig von ${escHtml(a.etiketten_fertig_von || 'Vertrieb')}</div>` : ''}
         ${erledigt ? `<div class="erledigt-info">${checkFillIcon} Aufgefuellt von ${escHtml(a.erledigt_von)} &mdash; ${erledigtDatum}</div>` : ''}
       </div>
 
       <div class="artikel-actions">
-        ${!erledigt ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
+        ${!erledigt && !hatEtiketten ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
         ${erledigt ? `<button class="action-btn" title="Wieder oeffnen" onclick="markiereOffen(${a.id})">${undoIcon}</button>` : ''}
         <button class="action-btn delete" title="Loeschen" onclick="loescheArtikel(${a.id}, '${escHtml(a.artikelname).replace(/'/g,"\\'")}')">
           ${trashIcon}

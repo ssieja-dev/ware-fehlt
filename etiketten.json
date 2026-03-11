@@ -1,0 +1,21 @@
+{
+  "eintraege": [
+    {
+      "id": 19,
+      "artikel_id": 27,
+      "artikelname": "Pferdekopfhaut mit Fell für Hunde 500g",
+      "artikelnummer": "2101-002",
+      "lagerort": "F03-06-01",
+      "menge": "4",
+      "gemeldet_von": "Diana",
+      "typ": "mhd",
+      "lieferung": "",
+      "mhd": "",
+      "erstellt_am": "2026-03-11T10:28:33.838Z",
+      "status": "erledigt",
+      "erledigt_von": "Derya",
+      "erledigt_am": "2026-03-11T10:37:28.434Z"
+    }
+  ],
+  "nextId": 20
+}

@@ -84,8 +84,10 @@ app.use(express.static(PUBLIC_DIR));
 // ── API ────────────────────────────────────────────────────
 // Alle Artikel
 app.get('/api/artikel', (req, res) => {
+  const rang = { offen: 0, etiketten: 1, erledigt: 2 };
   const sorted = [...db.artikel].sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'offen' ? -1 : 1;
+    const r = (rang[a.status] ?? 1) - (rang[b.status] ?? 1);
+    if (r !== 0) return r;
     return new Date(b.erstellt_am) - new Date(a.erstellt_am);
   });
   res.json(sorted);
@@ -142,6 +144,18 @@ app.patch('/api/artikel/:id/offen', (req, res) => {
   artikel.erledigt_am = null;
   speichereDB(db);
   io.emit('artikel_offen', artikel);
+  res.json(artikel);
+});
+
+// Etiketten bestellt → Status wechseln
+app.patch('/api/artikel/:id/etiketten', (req, res) => {
+  const id = parseInt(req.params.id);
+  const artikel = db.artikel.find(a => a.id === id);
+  if (!artikel) return res.status(404).json({ error: 'Nicht gefunden' });
+  artikel.status = 'etiketten';
+  artikel.etiketten_menge = (req.body.menge || '').toString().trim();
+  speichereDB(db);
+  io.emit('artikel_etiketten', artikel);
   res.json(artikel);
 });
 
@@ -299,15 +313,19 @@ app.get('/api/etiketten', (req, res) => {
 });
 
 app.post('/api/etiketten', (req, res) => {
-  const { artikelname, artikelnummer, lagerort, menge, gemeldet_von } = req.body;
+  const { artikel_id, artikelname, artikelnummer, lagerort, menge, gemeldet_von, typ, lieferung, mhd } = req.body;
   if (!artikelname?.trim()) return res.status(400).json({ error: 'Pflichtfelder fehlen' });
   const eintrag = {
     id: etikettenDB.nextId++,
+    artikel_id: artikel_id || null,
     artikelname: artikelname.trim(),
     artikelnummer: (artikelnummer || '').trim(),
     lagerort: (lagerort || '').trim(),
     menge: (menge || '').toString().trim(),
     gemeldet_von: (gemeldet_von || '').trim(),
+    typ: typ || 'lieferung',
+    lieferung: (lieferung || '').trim(),
+    mhd: (mhd || '').trim(),
     erstellt_am: new Date().toISOString(),
     status: 'offen',
     erledigt_von: null,
@@ -329,6 +347,18 @@ app.patch('/api/etiketten/:id/erledigt', (req, res) => {
   eintrag.erledigt_am = new Date().toISOString();
   speichereEtikettenDB(etikettenDB);
   io.emit('etikett_erledigt', eintrag);
+
+  // Verknüpften Lager-Artikel markieren
+  if (eintrag.artikel_id) {
+    const artikel = db.artikel.find(a => a.id === eintrag.artikel_id);
+    if (artikel) {
+      artikel.etiketten_fertig = true;
+      artikel.etiketten_fertig_von = eintrag.erledigt_von;
+      speichereDB(db);
+      io.emit('artikel_etiketten_fertig', artikel);
+    }
+  }
+
   res.json(eintrag);
 });
 

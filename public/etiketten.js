@@ -51,6 +51,7 @@ socket.on('etikett_neu', e => {
   renderListe();
   updateStats();
   toast(`Neuer Auftrag: ${e.artikelname} · ${e.menge} Etiketten`, 'info');
+  spieleSignalton();
 });
 socket.on('etikett_erledigt', e => {
   const idx = alleEtiketten.findIndex(x => x.id === e.id);
@@ -89,17 +90,80 @@ function updateStats() {
   document.getElementById('stat-erledigt').textContent = alleEtiketten.filter(e => e.status === 'erledigt').length;
 }
 
-async function markiereErledigt(id) {
+let pendingErledigtId = null;
+let etStepperWert = 1;
+let etStepperInterval = null;
+
+function etStepperAendern(delta) {
+  etStepperWert = Math.max(1, etStepperWert + delta);
+  document.getElementById('erledigt-menge-display').textContent = etStepperWert;
+}
+function etStepperStart(delta) {
+  etStepperAendern(delta);
+  etStepperInterval = setTimeout(() => {
+    etStepperInterval = setInterval(() => etStepperAendern(delta * 10), 100);
+  }, 500);
+}
+function etStepperStop() {
+  clearTimeout(etStepperInterval);
+  clearInterval(etStepperInterval);
+  etStepperInterval = null;
+}
+
+function markiereErledigt(id) {
+  const eintrag = alleEtiketten.find(e => e.id === id);
+  if (!eintrag) return;
+  pendingErledigtId = id;
+  document.getElementById('erledigt-artikel-info').innerHTML =
+    `${escHtml(eintrag.artikelname)}${eintrag.artikelnummer ? '<br><span style="font-size:.85rem;color:#6b7280;font-weight:400;">' + escHtml(eintrag.artikelnummer) + '</span>' : ''}`;
+  document.getElementById('erledigt-modal').classList.remove('hidden');
+}
+
+function closeErledigtModal() {
+  pendingErledigtId = null;
+  document.getElementById('erledigt-modal').classList.add('hidden');
+}
+
+async function bestaetigeErledigt() {
+  if (!pendingErledigtId) return;
+  const id = pendingErledigtId;
+  closeErledigtModal();
   try {
     const res = await fetch(`/api/etiketten/${id}/erledigt`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ erledigt_von: userName }),
+      body: JSON.stringify({ erledigt_von: userName, menge: etStepperWert }),
     });
     if (!res.ok) throw new Error();
     toast('Erledigt!', 'success');
   } catch {
     toast('Fehler', 'error');
+  }
+}
+
+let pendingLoescheId = null;
+
+function loescheEtikett(id, name) {
+  pendingLoescheId = id;
+  document.getElementById('delete-modal-text').textContent = `"${name}" wird gelöscht.`;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeLöscheModal() {
+  pendingLoescheId = null;
+  document.getElementById('delete-modal').classList.add('hidden');
+}
+
+async function bestaetigeLoesche() {
+  if (!pendingLoescheId) return;
+  const id = pendingLoescheId;
+  closeLöscheModal();
+  try {
+    const res = await fetch(`/api/etiketten/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error();
+    toast('Auftrag gelöscht', 'info');
+  } catch {
+    toast('Fehler beim Löschen', 'error');
   }
 }
 
@@ -129,11 +193,12 @@ function renderListe() {
     return;
   }
 
-  const locIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
-  const userIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-  const timeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+  const locIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+  const userIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+  const timeIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
   const checkIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
   const doneIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const trashIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
 
   container.innerHTML = gefiltert.map(e => {
     const erledigt = e.status === 'erledigt';
@@ -146,17 +211,57 @@ function renderListe() {
         >${checkIcon}</button>
         <div class="etikett-body">
           <div class="etikett-name">${escHtml(e.artikelname)}</div>
-          ${e.artikelnummer ? `<span class="artikel-nummer" style="margin-top:.25rem;display:inline-block;">${escHtml(e.artikelnummer)}</span>` : ''}
+          ${e.artikelnummer ? `<span class="etikett-nummer">${escHtml(e.artikelnummer)}</span>` : ''}
           <div><span class="etikett-menge">${escHtml(e.menge)} Etiketten</span></div>
+          ${e.typ === 'mhd' ? `<div style="margin-top:.4rem;"><span style="background:#fef9c3;border:1px solid #fde047;color:#854d0e;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;letter-spacing:.04em;">MHD am Artikel</span></div>` : ''}
+          ${e.typ === 'lieferung' && e.lieferung ? `<div style="margin-top:.4rem;"><span style="background:#f1f5f9;border:1px solid #cbd5e1;color:#374151;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;">📦 ${escHtml(e.lieferung)}</span></div>` : ''}
+          ${erledigt ? `<div class="erledigt-badge">${doneIcon} Erledigt von ${escHtml(e.erledigt_von)} &mdash; ${formatDatum(e.erledigt_am)}</div>` : ''}
           <div class="etikett-meta">
             ${e.lagerort ? `<span>${locIcon} ${escHtml(e.lagerort)}</span>` : ''}
             <span>${userIcon} ${escHtml(e.gemeldet_von)}</span>
             <span>${timeIcon} ${formatDatum(e.erstellt_am)}</span>
           </div>
-          ${erledigt ? `<div class="erledigt-badge">${doneIcon} Erledigt von ${escHtml(e.erledigt_von)} &mdash; ${formatDatum(e.erledigt_am)}</div>` : ''}
         </div>
+        <button class="action-btn delete" title="Löschen" onclick="loescheEtikett(${e.id}, '${escHtml(e.artikelname).replace(/'/g, "\\'")}')" style="flex-shrink:0;width:32px;height:32px;padding:0;">
+          ${trashIcon}
+        </button>
       </div>`;
   }).join('');
+}
+
+// ── SIGNALTON ─────────────────────────────────────────────────
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+// AudioContext beim ersten Tippen/Klick entsperren
+document.addEventListener('touchstart', initAudio, { once: false, passive: true });
+document.addEventListener('click', initAudio, { once: false, passive: true });
+
+function spieleSignalton() {
+  try {
+    initAudio();
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    const t = audioCtx.currentTime;
+    [[880, 0], [1100, 0.2], [1320, 0.4]].forEach(([freq, delay]) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t + delay);
+      gain.gain.linearRampToValueAtTime(0.5, t + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + delay + 0.25);
+      osc.start(t + delay);
+      osc.stop(t + delay + 0.3);
+    });
+  } catch {}
 }
 
 // ── HILFSFUNKTIONEN ───────────────────────────────────────────
@@ -170,6 +275,12 @@ function formatDatum(iso) {
   else if (d.toDateString() === gestern.toDateString()) prefix = 'Gestern';
   else prefix = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
   return `${prefix} ${d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })}`;
+}
+
+function formatMHD(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
 }
 
 function escHtml(str) {

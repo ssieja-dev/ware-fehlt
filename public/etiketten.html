@@ -18,10 +18,10 @@
     .etikett-body { flex: 1; min-width: 0; }
     .etikett-name { font-size: 1.05rem; font-weight: 700; color: var(--text); word-break: break-word; }
     .etikett-menge {
-      display: inline-block; margin-top: .3rem;
+      display: inline-block; margin-top: .4rem;
       background: #eff6ff; border: 1px solid #bfdbfe;
-      color: #1d4ed8; font-size: .95rem; font-weight: 700;
-      border-radius: 6px; padding: .15rem .55rem;
+      color: #1d4ed8; font-size: 1.15rem; font-weight: 700; letter-spacing: .04em;
+      border-radius: 8px; padding: .3rem .75rem;
     }
     .etikett-meta { display: flex; flex-wrap: wrap; gap: .4rem .8rem; margin-top: .45rem; }
     .etikett-meta span { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: var(--text2); }
@@ -34,9 +34,9 @@
     .erledigt-badge svg { width: 13px; height: 13px; }
     .check-btn-et {
       width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%;
-      border: 2px solid var(--border); background: transparent;
+      border: 2px solid var(--green); background: var(--green-bg);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: all .2s; color: var(--text3);
+      transition: all .2s; color: var(--green);
     }
     .check-btn-et:hover { border-color: var(--green); color: var(--green); background: var(--green-bg); }
     .check-btn-et.checked { border-color: var(--green); background: var(--green); color: #fff; }
@@ -49,9 +49,81 @@
     .name-bar strong { color: var(--text); }
     .name-bar button { margin-left: auto; font-size: .78rem; background: none; border: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
     .name-modal-simple { display: flex; flex-direction: column; gap: .75rem; }
+    .mengen-stepper {
+      display: flex; align-items: center; justify-content: center; gap: .6rem; margin: .5rem 0;
+    }
+    .stepper-btn {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 2px solid #d1d5db; background: #f3f4f6;
+      font-size: 1.6rem; font-weight: 300; color: #111827;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all .15s; user-select: none;
+    }
+    .stepper-btn:active { transform: scale(.9); background: #d1d5db; }
+    .stepper-wert {
+      min-width: 64px; text-align: center;
+      font-size: 2.4rem; font-weight: 700; color: #111827; line-height: 1;
+    }
+    .stepper-confirm {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: none; background: #16a34a; color: #fff;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all .15s; margin-left: .4rem;
+    }
+    .stepper-confirm:active { transform: scale(.9); background: #15803d; }
+    .stepper-confirm svg { width: 22px; height: 22px; }
+    .btn-et-confirm {
+      width: 100%; padding: .75rem; border: none; border-radius: var(--radius-sm);
+      background: #16a34a; color: #fff; font-size: 1rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: .5rem; margin-bottom: .5rem; transition: background .2s;
+    }
+    .btn-et-confirm:hover { background: #15803d; }
+    .btn-et-confirm svg { width: 18px; height: 18px; }
+    .btn-delete-confirm {
+      width: 100%; padding: .75rem; border: none; border-radius: var(--radius-sm);
+      background: var(--red); color: #fff; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-delete-confirm:hover { background: #dc2626; }
+    .etikett-nummer {
+      display: inline-block; margin-top: .4rem;
+      background: #1e3a5f; color: #fff;
+      font-size: 1.15rem; font-weight: 700; letter-spacing: .04em;
+      border-radius: 8px; padding: .3rem .75rem;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Erledigt-Modal mit Stepper -->
+  <div id="erledigt-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-icon" style="background:#f0fdf4;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h2>Etiketten fertig?</h2>
+      <p id="erledigt-artikel-info" style="font-weight:600;color:#374151;margin-bottom:1rem;"></p>
+      <button class="btn-et-confirm" onclick="bestaetigeErledigt()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        Etiketten fertig
+      </button>
+      <button class="btn-secondary" onclick="closeErledigtModal()">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- Löschen-Modal -->
+  <div id="delete-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-icon" style="background:#fef2f2;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </div>
+      <h2>Auftrag löschen?</h2>
+      <p id="delete-modal-text" style="font-weight:600;color:#374151;"></p>
+      <button class="btn-delete-confirm" onclick="bestaetigeLoesche()">Ja, löschen</button>
+      <button class="btn-secondary" onclick="closeLöscheModal()">Abbrechen</button>
+    </div>
+  </div>
 
   <!-- Name-Modal (kein Passwort, nur Name) -->
   <div id="name-modal" class="modal-overlay hidden">
