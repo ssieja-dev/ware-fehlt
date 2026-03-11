@@ -12,6 +12,7 @@ process.on('uncaughtException', err => {
 
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const fs = require('fs');
@@ -19,7 +20,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: '*' } });
 
 const PASSWORT = '02154';
 
@@ -32,9 +33,53 @@ app.use(session({
 
 app.use(express.json());
 
-// Auth-Middleware für alle API-Routen außer /api/login
+// ── Portal-Nutzer ───────────────────────────────────────────
+const PORTAL_USERS_FILE = process.pkg
+  ? path.join(path.dirname(process.execPath), 'portal-users.json')
+  : path.join(__dirname, 'portal-users.json');
+
+function ladePortalUsers() {
+  try {
+    if (fs.existsSync(PORTAL_USERS_FILE)) {
+      return JSON.parse(fs.readFileSync(PORTAL_USERS_FILE, 'utf8')).users || [];
+    }
+  } catch {}
+  return [];
+}
+
+app.post('/api/portal/login', (req, res) => {
+  const { name, passwort } = req.body;
+  const users = ladePortalUsers();
+  const user = users.find(u =>
+    u.name.toLowerCase() === (name || '').toLowerCase() &&
+    u.passwort === passwort
+  );
+  if (user) {
+    req.session.angemeldet = true;
+    req.session.portalUser = { name: user.name, apps: user.apps || [] };
+    res.json({ name: user.name, apps: user.apps || [] });
+  } else {
+    res.status(401).json({ error: 'Falsche Zugangsdaten' });
+  }
+});
+
+app.get('/api/portal/me', (req, res) => {
+  if (req.session?.portalUser) {
+    res.json(req.session.portalUser);
+  } else {
+    res.status(401).json({ error: 'Nicht angemeldet' });
+  }
+});
+
+app.post('/api/portal/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ ok: true });
+});
+
+// Auth-Middleware für alle API-Routen außer /api/login und /api/portal/*
 app.use('/api', (req, res, next) => {
   if (req.path === '/login') return next();
+  if (req.path.startsWith('/portal/')) return next();
   if (req.path.startsWith('/etiketten')) return next(); // Vertrieb: kein Login nötig
   if (req.session?.angemeldet) return next();
   res.status(401).json({ error: 'Nicht angemeldet' });
@@ -75,10 +120,39 @@ function speichereDB(db) {
 
 let db = ladeDB();
 
+// ── Portal-Token Login ──────────────────────────────────────
+function validierePortalToken(token) {
+  return new Promise((resolve, reject) => {
+    http.get(`http://localhost:3003/api/app-token/${token}`, res => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        if (res.statusCode === 200) resolve(JSON.parse(data));
+        else reject(new Error('Ungültig'));
+      });
+    }).on('error', reject);
+  });
+}
+
 // ── Middleware ─────────────────────────────────────────────
 const PUBLIC_DIR = process.pkg
   ? path.join(path.dirname(process.execPath), 'public')
   : path.join(__dirname, 'public');
+
+// Portal-Token abfangen bevor statische Dateien
+app.get('/', async (req, res, next) => {
+  const token = req.query.portal_token;
+  if (!token) return next();
+  try {
+    const user = await validierePortalToken(token);
+    req.session.angemeldet = true;
+    req.session.portalUser = { name: user.name };
+    res.redirect('/');
+  } catch {
+    res.redirect('/');
+  }
+});
+
 app.use(express.static(PUBLIC_DIR));
 
 // ── API ────────────────────────────────────────────────────
@@ -305,6 +379,7 @@ function speichereEtikettenDB(db) {
 let etikettenDB = ladeEtikettenDB();
 
 app.get('/api/etiketten', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   const sorted = [...etikettenDB.eintraege].sort((a, b) => {
     if (a.status !== b.status) return a.status === 'offen' ? -1 : 1;
     return new Date(b.erstellt_am) - new Date(a.erstellt_am);
@@ -313,7 +388,7 @@ app.get('/api/etiketten', (req, res) => {
 });
 
 app.post('/api/etiketten', (req, res) => {
-  const { artikel_id, artikelname, artikelnummer, lagerort, menge, gemeldet_von, typ, lieferung, mhd } = req.body;
+  const { artikel_id, artikelname, artikelnummer, lagerort, menge, gemeldet_von, typ, lieferung, mhd, quelle, ref_auftrag_id } = req.body;
   if (!artikelname?.trim()) return res.status(400).json({ error: 'Pflichtfelder fehlen' });
   const eintrag = {
     id: etikettenDB.nextId++,
@@ -326,6 +401,8 @@ app.post('/api/etiketten', (req, res) => {
     typ: typ || 'lieferung',
     lieferung: (lieferung || '').trim(),
     mhd: (mhd || '').trim(),
+    quelle: (quelle || '').trim(),
+    ref_auftrag_id: ref_auftrag_id || null,
     erstellt_am: new Date().toISOString(),
     status: 'offen',
     erledigt_von: null,

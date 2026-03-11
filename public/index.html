@@ -11,7 +11,7 @@
 <body>
 
   <!-- Login-Modal beim Start -->
-  <div id="name-modal" class="modal-overlay">
+  <div id="name-modal" class="modal-overlay hidden">
     <div class="modal-box">
       <img src="/logo.png" alt="PITUPITA" class="modal-logo" />
       <div class="modal-app-title">Ware fehlt</div>
@@ -77,7 +77,34 @@
         <button class="et-toggle-btn" id="toggle-mhd" onclick="setEtikettenTyp('mhd')">MHD am Artikel</button>
       </div>
       <div id="et-feld-lieferung" class="et-feld">
-        <input type="text" id="etiketten-lieferung" placeholder="z.B. Charge 2024-01, Lieferant..." maxlength="100" />
+        <div class="lieferung-panel">
+          <div class="lieferung-datum-row">
+            <input type="date" id="et-lieferung-datum" oninput="updateEtLieferungPreview()" />
+            <span class="kw-badge" id="et-kw-badge">KW –</span>
+          </div>
+          <div class="pickers-row">
+            <div class="picker-wrap">
+              <div class="picker-label">Nummer</div>
+              <div class="drum-picker" id="et-picker-nummer">
+                <div class="picker-items" id="et-picker-nummer-items"></div>
+                <div class="picker-fade-top"></div>
+                <div class="picker-fade-bottom"></div>
+                <div class="picker-selector"></div>
+              </div>
+            </div>
+            <div class="picker-wrap">
+              <div class="picker-label">Lieferant</div>
+              <div class="drum-picker" id="et-picker-lieferant">
+                <div class="picker-items" id="et-picker-lieferant-items"></div>
+                <div class="picker-fade-top"></div>
+                <div class="picker-fade-bottom"></div>
+                <div class="picker-selector"></div>
+              </div>
+            </div>
+          </div>
+          <div class="lieferung-preview" id="et-lieferung-preview">–</div>
+        </div>
+        <input type="hidden" id="etiketten-lieferung" />
       </div>
 
       <button class="btn-secondary" style="margin-top:.5rem;" onclick="closeEtikettenModal()">Abbrechen</button>
@@ -87,21 +114,24 @@
   <!-- Header -->
   <header>
     <div class="header-inner">
-      <div class="logo">
+      <div class="header-logo-row">
         <img src="/logo.png" alt="PITUPITA" class="header-logo" />
       </div>
-      <div class="header-right">
-        <div class="connection-status" id="conn-status">
-          <span class="dot"></span>
-          <span class="conn-label">Verbinde...</span>
+      <div class="header-controls-row">
+        <a href="#" id="portal-back-btn" class="portal-back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
+          Portal
+        </a>
+        <div class="header-right">
+          <div class="connection-status" id="conn-status">
+            <span class="dot"></span>
+            <span class="conn-label">Verbinde...</span>
+          </div>
+          <div class="current-user" id="current-user-display">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="current-user-name">-</span>
+          </div>
         </div>
-        <div class="current-user" id="current-user-display" onclick="changeUser()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span id="current-user-name">-</span>
-        </div>
-        <button class="logout-btn" onclick="logout()" title="Abmelden">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
       </div>
     </div>
   </header>
@@ -120,8 +150,8 @@
       <span class="stat-label">Erledigt</span>
     </div>
     <div class="stat-card">
-      <span class="stat-num blue" id="stat-lagerorte">0</span>
-      <span class="stat-label">Lagerorte</span>
+      <span class="stat-num blue" id="stat-etiketten">0</span>
+      <span class="stat-label">Etiketten</span>
     </div>
     <div class="stat-card">
       <span class="stat-num gray" id="stat-gesamt">0</span>
@@ -152,7 +182,12 @@
           </div>
           <div class="form-group required">
             <label>Artikelnummer</label>
-            <input type="text" id="f-nummer" placeholder="z.B. 21-4270-002" maxlength="50" />
+            <div class="input-wrap">
+              <input type="text" id="f-nummer" placeholder="z.B. 21-4270-002" maxlength="50" autocomplete="off" oninput="document.getElementById('f-nummer-clear').classList.toggle('hidden',!this.value)" />
+              <button type="button" id="f-nummer-clear" class="input-clear hidden" tabindex="-1" onclick="clearArtikelNummer()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
           </div>
           <div class="form-group required">
             <label>Lagerort</label>
@@ -209,6 +244,7 @@
         </div>
       </div>
     </section>
+
   </main>
 
   <!-- Toast-Bereich -->

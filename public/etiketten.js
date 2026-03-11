@@ -6,6 +6,9 @@ let aktuellerFilter = 'offen';
 let userName = localStorage.getItem('etiketten_username') || '';
 
 window.addEventListener('DOMContentLoaded', () => {
+  const backBtn = document.getElementById('portal-back-btn');
+  if (backBtn) backBtn.href = `http://${window.location.hostname}:3003`;
+
   if (!userName) {
     document.getElementById('name-modal').classList.remove('hidden');
     setTimeout(() => document.getElementById('name-input').focus(), 50);
@@ -213,13 +216,14 @@ function renderListe() {
           <div class="etikett-name">${escHtml(e.artikelname)}</div>
           ${e.artikelnummer ? `<span class="etikett-nummer">${escHtml(e.artikelnummer)}</span>` : ''}
           <div><span class="etikett-menge">${escHtml(e.menge)} Etiketten</span></div>
-          ${e.typ === 'mhd' ? `<div style="margin-top:.4rem;"><span style="background:#fef9c3;border:1px solid #fde047;color:#854d0e;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;letter-spacing:.04em;">MHD am Artikel</span></div>` : ''}
-          ${e.typ === 'lieferung' && e.lieferung ? `<div style="margin-top:.4rem;"><span style="background:#f1f5f9;border:1px solid #cbd5e1;color:#374151;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;">📦 ${escHtml(e.lieferung)}</span></div>` : ''}
+          ${e.typ === 'mhd' ? `<div style="margin-top:.4rem;"><span style="background:#fef9c3;border:1px solid #fde047;color:#854d0e;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;letter-spacing:.04em;display:inline-block;">MHD am Artikel</span></div>` : ''}
+          ${e.typ === 'lieferung' && e.lieferung ? `<div style="margin-top:.4rem;"><span style="background:#f1f5f9;border:1px solid #cbd5e1;color:#374151;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;display:inline-block;">📦 ${escHtml(e.lieferung)}</span></div>` : ''}
           ${erledigt ? `<div class="erledigt-badge">${doneIcon} Erledigt von ${escHtml(e.erledigt_von)} &mdash; ${formatDatum(e.erledigt_am)}</div>` : ''}
           <div class="etikett-meta">
             ${e.lagerort ? `<span>${locIcon} ${escHtml(e.lagerort)}</span>` : ''}
             <span>${userIcon} ${escHtml(e.gemeldet_von)}</span>
             <span>${timeIcon} ${formatDatum(e.erstellt_am)}</span>
+            ${e.quelle ? `<span style="margin-left:auto;font-size:.72rem;font-weight:500;padding:.15rem .5rem;border-radius:5px;${e.quelle === 'Etiketten bestellen' ? 'background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.3);' : 'background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.25);'}">${escHtml(e.quelle)}</span>` : ''}
           </div>
         </div>
         <button class="action-btn delete" title="Löschen" onclick="loescheEtikett(${e.id}, '${escHtml(e.artikelname).replace(/'/g, "\\'")}')" style="flex-shrink:0;width:32px;height:32px;padding:0;">

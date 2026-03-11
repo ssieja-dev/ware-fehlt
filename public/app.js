@@ -11,6 +11,8 @@ let userName = localStorage.getItem('lager_username') || '';
 // ── INITIALISIERUNG ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   pruefSession();
+  const backBtn = document.getElementById('portal-back-btn');
+  if (backBtn) backBtn.href = `http://${window.location.hostname}:3003`;
 
   // Enter-Taste im Login-Modal
   document.getElementById('user-name-input').addEventListener('keydown', e => {
@@ -49,6 +51,105 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+// ── DRUM PICKER ──────────────────────────────────────────────
+const DRUM_ITEM_H = 26;
+const DRUM_PADDING = 2;
+
+function initDrumPicker(id, items, onChange) {
+  const container = document.getElementById(id);
+  const itemsEl   = document.getElementById(id + '-items');
+  let idx = 0, translateY = 0;
+  let startY = 0, startTranslate = 0, dragging = false;
+  let lastY = 0, lastTime = 0, velocity = 0;
+
+  const padded = [...Array(DRUM_PADDING).fill(''), ...items, ...Array(DRUM_PADDING).fill('')];
+  itemsEl.innerHTML = padded.map(v => `<div class="picker-item">${v}</div>`).join('');
+  const allEls = itemsEl.querySelectorAll('.picker-item');
+
+  function snap(i, animate) {
+    idx = Math.max(0, Math.min(items.length - 1, i));
+    translateY = -idx * DRUM_ITEM_H;
+    itemsEl.style.transition = animate ? 'transform .25s cubic-bezier(.2,.8,.4,1)' : 'none';
+    itemsEl.style.transform = `translateY(${translateY}px)`;
+    allEls.forEach((el, j) => el.classList.toggle('active', j === idx + DRUM_PADDING));
+    onChange(items[idx]);
+  }
+
+  function onStart(y) {
+    dragging = true;
+    startY = lastY = y; lastTime = Date.now(); velocity = 0;
+    startTranslate = translateY;
+    itemsEl.style.transition = 'none';
+  }
+  function onMove(y) {
+    if (!dragging) return;
+    const now = Date.now();
+    velocity = (y - lastY) / Math.max(1, now - lastTime);
+    lastY = y; lastTime = now;
+    translateY = startTranslate + (y - startY);
+    itemsEl.style.transform = `translateY(${translateY}px)`;
+  }
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    snap(Math.round(-(translateY + velocity * 80) / DRUM_ITEM_H), true);
+  }
+
+  container.addEventListener('mousedown', e => { e.preventDefault(); onStart(e.clientY); });
+  window.addEventListener('mousemove', e => onMove(e.clientY));
+  window.addEventListener('mouseup', () => onEnd());
+  container.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0].clientY); }, { passive: false });
+  container.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0].clientY); }, { passive: false });
+  container.addEventListener('touchend',   e => { e.preventDefault(); onEnd(); }, { passive: false });
+
+  snap(0, false);
+  return { reset: () => snap(0, true), getValue: () => items[idx] };
+}
+
+let etNumPicker = null;
+let etLetterPicker = null;
+
+function initEtPickers() {
+  if (etNumPicker) return; // already initialized
+  const numItems    = Array.from({ length: 101 }, (_, i) => String(200 + i));
+  const letterItems = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  etNumPicker    = initDrumPicker('et-picker-nummer',    numItems,    () => updateEtLieferungPreview());
+  etLetterPicker = initDrumPicker('et-picker-lieferant', letterItems, () => updateEtLieferungPreview());
+}
+
+function getKW(dateStr) {
+  const d = new Date(dateStr);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+function updateEtLieferungPreview() {
+  const datumStr = document.getElementById('et-lieferung-datum').value;
+  const kw = datumStr ? getKW(datumStr) : null;
+  document.getElementById('et-kw-badge').textContent = kw ? `${kw} KW` : '– KW';
+
+  let datumFormatted = '';
+  if (datumStr) {
+    const [y, m, d] = datumStr.split('-');
+    datumFormatted = `${d}.${m}.${y}`;
+  }
+
+  const num    = etNumPicker    ? etNumPicker.getValue()    : '';
+  const letter = etLetterPicker ? etLetterPicker.getValue() : '';
+
+  const parts = [];
+  if (kw)             parts.push(`${kw}KW`);
+  if (datumFormatted) parts.push(datumFormatted);
+  if (num)            parts.push(num);
+  if (letter)         parts.push(letter);
+
+  const val = parts.join(' ');
+  document.getElementById('et-lieferung-preview').textContent = val || '–';
+  document.getElementById('etiketten-lieferung').value = val;
+}
 
 // ── KATALOG ──────────────────────────────────────────────────
 async function ladeLagerbestand() {
@@ -113,6 +214,7 @@ function waehlKatalogEintrag(k) {
   document.getElementById('f-name').value = k.artikelname;
   document.getElementById('f-name-clear').classList.remove('hidden');
   document.getElementById('f-nummer').value = k.artikelnummer || '';
+  document.getElementById('f-nummer-clear').classList.toggle('hidden', !k.artikelnummer);
   document.getElementById('f-lagerort').value = k.lagerort || '';
   zeigAnmerkung(k.anmerkung || '');
   zeigBestandInfo(k.artikelnummer || '');
@@ -164,8 +266,26 @@ function clearArtikelName() {
   fName.focus();
 }
 
+function clearArtikelNummer() {
+  document.getElementById('f-nummer').value = '';
+  document.getElementById('f-nummer-clear').classList.add('hidden');
+  document.getElementById('f-nummer').focus();
+}
+
 // ── LOGIN ────────────────────────────────────────────────────
 async function pruefSession() {
+  try {
+    // Portal-Session prüfen → Name automatisch übernehmen
+    const portalRes = await fetch('/api/portal/me');
+    if (portalRes.ok) {
+      const portalUser = await portalRes.json();
+      if (portalUser?.name) {
+        userName = portalUser.name;
+        localStorage.setItem('lager_username', userName);
+      }
+    }
+  } catch {}
+
   try {
     const res = await fetch('/api/artikel');
     if (res.status === 401) {
@@ -179,6 +299,7 @@ async function pruefSession() {
       ladeStatistik();
       ladeKatalog();
       ladeLagerbestand();
+      ladeEtikettenFertig();
       updateUserDisplay();
     }
   } catch {
@@ -222,9 +343,19 @@ async function setUserName() {
   ladeStatistik();
   ladeKatalog();
   ladeLagerbestand();
+  ladeEtikettenFertig();
 }
 
 async function logout() {
+  // Bei Portal-Session: zurück zum Portal
+  try {
+    const portalRes = await fetch('/api/portal/me');
+    if (portalRes.ok) {
+      await fetch('/api/portal/logout', { method: 'POST' });
+      window.location.href = '/portal.html';
+      return;
+    }
+  } catch {}
   await fetch('/api/logout', { method: 'POST' });
   userName = '';
   localStorage.removeItem('lager_username');
@@ -282,7 +413,10 @@ socket.on('artikel_etiketten', artikel => {
 socket.on('artikel_etiketten_fertig', artikel => {
   updateArtikelInListe(artikel);
   ladeStatistik();
-  toast(`Etiketten fertig: ${artikel.artikelname}`, 'success');
+});
+socket.on('etikett_erledigt', eintrag => {
+  ladeEtikettenFertig();
+  toast(`Etiketten fertig: ${eintrag.artikelname}`, 'success');
   spieleEtikettenFertigTon();
 });
 socket.on('lagerbestand_update', data => {
@@ -327,13 +461,62 @@ async function ladeArtikel() {
   }
 }
 
+async function ladeEtikettenFertig() {
+  try {
+    const res = await fetch('/api/etiketten');
+    const alle = await res.json();
+    const fertig = alle.filter(e => e.status === 'erledigt');
+    renderEtikettenFertig(fertig);
+  } catch {}
+}
+
+function renderEtikettenFertig(liste) {
+  const container = document.getElementById('etiketten-fertig-liste');
+  const badge = document.getElementById('fertig-count-badge');
+  if (!container) return;
+
+  if (liste.length === 0) {
+    badge.style.display = 'none';
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        <p>Keine fertigen Etiketten</p>
+      </div>`;
+    return;
+  }
+
+  badge.style.display = 'inline-flex';
+  badge.textContent = liste.length;
+
+  const locIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+  const timeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+  const userIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+
+  container.innerHTML = liste.map(e => `
+    <div class="fertig-item">
+      <div class="fertig-body">
+        <div class="fertig-name">${escHtml(e.artikelname)}</div>
+        ${e.artikelnummer ? `<span class="fertig-nummer">${escHtml(e.artikelnummer)}</span>` : ''}
+        <span class="fertig-menge">${escHtml(e.menge)} Etiketten</span>
+        ${e.typ === 'mhd' ? `<span class="fertig-typ-badge mhd">MHD am Artikel</span>` : ''}
+        ${e.typ === 'lieferung' && e.lieferung ? `<span class="fertig-typ-badge lieferung">📦 ${escHtml(e.lieferung)}</span>` : ''}
+        <div class="fertig-meta">
+          ${e.lagerort ? `<span>${locIcon} ${escHtml(e.lagerort)}</span>` : ''}
+          <span>${userIcon} Fertig von <strong>${escHtml(e.erledigt_von)}</strong></span>
+          <span>${timeIcon} ${formatDatum(e.erledigt_am)}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
 async function ladeStatistik() {
   try {
     const res = await fetch('/api/statistik');
     const d = await res.json();
     animateNum('stat-offen', d.offen);
     animateNum('stat-erledigt', d.erledigt);
-    animateNum('stat-lagerorte', d.lagerorte);
+    animateNum('stat-etiketten', alleArtikel.filter(a => a.status === 'etiketten').length);
     animateNum('stat-gesamt', d.gesamt);
   } catch {}
 }
@@ -401,6 +584,8 @@ async function submitArtikel() {
     ['f-name','f-nummer','f-lagerort','f-notiz'].forEach(id => {
       document.getElementById(id).value = '';
     });
+    document.getElementById('f-name-clear').classList.add('hidden');
+    document.getElementById('f-nummer-clear').classList.add('hidden');
     document.getElementById('f-name').focus();
     toast(`"${name}" gemeldet`, 'success');
   } catch {
@@ -534,7 +719,11 @@ function openEtikettenModal(id) {
   stepperWert = 1;
   document.getElementById('etiketten-menge-display').textContent = 1;
   setEtikettenTyp('lieferung');
-  document.getElementById('etiketten-lieferung').value = '';
+  initEtPickers();
+  if (etNumPicker)    etNumPicker.reset();
+  if (etLetterPicker) etLetterPicker.reset();
+  document.getElementById('et-lieferung-datum').value = new Date().toISOString().slice(0, 10);
+  updateEtLieferungPreview();
   document.getElementById('etiketten-modal').classList.remove('hidden');
 }
 
@@ -567,6 +756,7 @@ async function bestaetigeEtiketten() {
         gemeldet_von: userName,
         typ: etikettenTyp,
         lieferung: etikettenTyp === 'lieferung' ? document.getElementById('etiketten-lieferung').value.trim() : '',
+        quelle: 'Ware fehlt',
       }),
     });
     if (!res.ok) throw new Error();

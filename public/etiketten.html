@@ -19,11 +19,11 @@
     .etikett-name { font-size: 1.05rem; font-weight: 700; color: var(--text); word-break: break-word; }
     .etikett-menge {
       display: inline-block; margin-top: .4rem;
-      background: #eff6ff; border: 1px solid #bfdbfe;
-      color: #1d4ed8; font-size: 1.15rem; font-weight: 700; letter-spacing: .04em;
+      background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.4);
+      color: #93c5fd; font-size: 1.15rem; font-weight: 700; letter-spacing: .04em;
       border-radius: 8px; padding: .3rem .75rem;
     }
-    .etikett-meta { display: flex; flex-wrap: wrap; gap: .4rem .8rem; margin-top: .45rem; }
+    .etikett-meta { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-top: .6rem; }
     .etikett-meta span { display: flex; align-items: center; gap: .3rem; font-size: .8rem; color: var(--text2); }
     .etikett-meta svg { width: 13px; height: 13px; flex-shrink: 0; }
     .erledigt-badge {
@@ -55,15 +55,15 @@
     }
     .stepper-btn {
       width: 52px; height: 52px; border-radius: 50%;
-      border: 2px solid #d1d5db; background: #f3f4f6;
-      font-size: 1.6rem; font-weight: 300; color: #111827;
+      border: 2px solid var(--border2); background: var(--bg3);
+      font-size: 1.6rem; font-weight: 300; color: var(--text);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: all .15s; user-select: none;
     }
-    .stepper-btn:active { transform: scale(.9); background: #d1d5db; }
+    .stepper-btn:active { transform: scale(.9); background: var(--border); }
     .stepper-wert {
       min-width: 64px; text-align: center;
-      font-size: 2.4rem; font-weight: 700; color: #111827; line-height: 1;
+      font-size: 2.4rem; font-weight: 700; color: var(--text); line-height: 1;
     }
     .stepper-confirm {
       width: 52px; height: 52px; border-radius: 50%;
@@ -140,13 +140,19 @@
 
   <header>
     <div class="header-inner">
-      <div class="logo">
+      <div class="header-logo-row">
         <img src="/logo.png" alt="PITUPITA" class="header-logo" />
       </div>
-      <div class="header-right">
-        <div class="connection-status" id="conn-status">
-          <span class="dot"></span>
-          <span class="conn-label">Verbinde...</span>
+      <div class="header-controls-row">
+        <a href="#" id="portal-back-btn" class="portal-back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="15 18 9 12 15 6"/></svg>
+          Portal
+        </a>
+        <div class="header-right">
+          <div class="connection-status" id="conn-status">
+            <span class="dot"></span>
+            <span class="conn-label">Verbinde...</span>
+          </div>
         </div>
       </div>
     </div>
@@ -156,7 +162,6 @@
     <div class="name-bar-right">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Angemeldet als <strong id="name-display"></strong>
-      <button onclick="changeName()">Ändern</button>
     </div>
   </div>
 
