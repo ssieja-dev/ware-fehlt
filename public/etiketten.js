@@ -1,0 +1,205 @@
+'use strict';
+
+const socket = io();
+let alleEtiketten = [];
+let aktuellerFilter = 'offen';
+let userName = localStorage.getItem('etiketten_username') || '';
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (!userName) {
+    document.getElementById('name-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('name-input').focus(), 50);
+  } else {
+    zeigeNameBar();
+    ladeEtiketten();
+  }
+
+  document.getElementById('name-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') setName();
+  });
+  document.getElementById('name-btn').addEventListener('touchend', e => {
+    e.preventDefault(); setName();
+  });
+});
+
+function setName() {
+  const val = document.getElementById('name-input').value.trim();
+  if (!val) { shake(document.getElementById('name-input')); return; }
+  userName = val;
+  localStorage.setItem('etiketten_username', userName);
+  document.getElementById('name-modal').classList.add('hidden');
+  zeigeNameBar();
+  ladeEtiketten();
+}
+
+function changeName() {
+  document.getElementById('name-input').value = userName;
+  document.getElementById('name-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('name-input').focus(), 50);
+}
+
+function zeigeNameBar() {
+  document.getElementById('name-display').textContent = userName;
+  document.getElementById('name-bar').classList.remove('hidden');
+}
+
+// ── SOCKET.IO ─────────────────────────────────────────────────
+socket.on('connect', () => setConnectionStatus(true));
+socket.on('disconnect', () => setConnectionStatus(false));
+socket.on('etikett_neu', e => {
+  alleEtiketten.unshift(e);
+  renderListe();
+  updateStats();
+  toast(`Neuer Auftrag: ${e.artikelname} · ${e.menge} Etiketten`, 'info');
+});
+socket.on('etikett_erledigt', e => {
+  const idx = alleEtiketten.findIndex(x => x.id === e.id);
+  if (idx !== -1) alleEtiketten[idx] = e;
+  renderListe();
+  updateStats();
+});
+socket.on('etikett_geloescht', ({ id }) => {
+  alleEtiketten = alleEtiketten.filter(e => e.id !== id);
+  renderListe();
+  updateStats();
+});
+
+function setConnectionStatus(connected) {
+  const dot = document.querySelector('.dot');
+  const label = document.querySelector('.conn-label');
+  dot.classList.toggle('connected', connected);
+  label.classList.toggle('connected', connected);
+  label.textContent = connected ? 'Verbunden' : 'Getrennt';
+}
+
+// ── DATEN ─────────────────────────────────────────────────────
+async function ladeEtiketten() {
+  try {
+    const res = await fetch('/api/etiketten');
+    alleEtiketten = await res.json();
+    renderListe();
+    updateStats();
+  } catch {
+    toast('Fehler beim Laden', 'error');
+  }
+}
+
+function updateStats() {
+  document.getElementById('stat-offen').textContent = alleEtiketten.filter(e => e.status === 'offen').length;
+  document.getElementById('stat-erledigt').textContent = alleEtiketten.filter(e => e.status === 'erledigt').length;
+}
+
+async function markiereErledigt(id) {
+  try {
+    const res = await fetch(`/api/etiketten/${id}/erledigt`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ erledigt_von: userName }),
+    });
+    if (!res.ok) throw new Error();
+    toast('Erledigt!', 'success');
+  } catch {
+    toast('Fehler', 'error');
+  }
+}
+
+// ── FILTER & RENDERING ────────────────────────────────────────
+function setFilter(filter, btn) {
+  aktuellerFilter = filter;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderListe();
+}
+
+function renderListe() {
+  const gefiltert = alleEtiketten.filter(e =>
+    aktuellerFilter === 'alle' || e.status === aktuellerFilter
+  );
+
+  const container = document.getElementById('etikett-liste');
+  if (gefiltert.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
+        <p>${aktuellerFilter === 'offen' ? 'Keine offenen Aufträge' : 'Keine Einträge'}</p>
+      </div>`;
+    return;
+  }
+
+  const locIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+  const userIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+  const timeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+  const checkIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const doneIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+  container.innerHTML = gefiltert.map(e => {
+    const erledigt = e.status === 'erledigt';
+    return `
+      <div class="etikett-item ${erledigt ? 'erledigt' : ''}">
+        <button class="check-btn-et ${erledigt ? 'checked' : ''}"
+          title="${erledigt ? 'Bereits erledigt' : 'Als erledigt markieren'}"
+          onclick="${erledigt ? '' : `markiereErledigt(${e.id})`}"
+          ${erledigt ? 'disabled' : ''}
+        >${checkIcon}</button>
+        <div class="etikett-body">
+          <div class="etikett-name">${escHtml(e.artikelname)}</div>
+          ${e.artikelnummer ? `<span class="artikel-nummer" style="margin-top:.25rem;display:inline-block;">${escHtml(e.artikelnummer)}</span>` : ''}
+          <div><span class="etikett-menge">${escHtml(e.menge)} Etiketten</span></div>
+          <div class="etikett-meta">
+            ${e.lagerort ? `<span>${locIcon} ${escHtml(e.lagerort)}</span>` : ''}
+            <span>${userIcon} ${escHtml(e.gemeldet_von)}</span>
+            <span>${timeIcon} ${formatDatum(e.erstellt_am)}</span>
+          </div>
+          ${erledigt ? `<div class="erledigt-badge">${doneIcon} Erledigt von ${escHtml(e.erledigt_von)} &mdash; ${formatDatum(e.erledigt_am)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── HILFSFUNKTIONEN ───────────────────────────────────────────
+function formatDatum(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const heute = new Date();
+  const gestern = new Date(heute); gestern.setDate(heute.getDate() - 1);
+  let prefix = '';
+  if (d.toDateString() === heute.toDateString()) prefix = 'Heute';
+  else if (d.toDateString() === gestern.toDateString()) prefix = 'Gestern';
+  else prefix = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+  return `${prefix} ${d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })}`;
+}
+
+function escHtml(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function shake(el) {
+  el.style.animation = 'none'; el.offsetHeight;
+  el.style.animation = 'shake .3s ease'; el.focus();
+  setTimeout(() => el.style.animation = '', 400);
+}
+
+function toast(msg, type = 'info') {
+  const icons = {
+    success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+    error:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    info:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+  };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `${icons[type] || icons.info}<span>${escHtml(msg)}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity .3s, transform .3s';
+    el.style.opacity = '0'; el.style.transform = 'translateX(10px)';
+    setTimeout(() => el.remove(), 300);
+  }, 3500);
+}
+
+const shakeStyle = document.createElement('style');
+shakeStyle.textContent = `@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }`;
+document.head.appendChild(shakeStyle);

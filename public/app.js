@@ -10,17 +10,13 @@ let userName = localStorage.getItem('lager_username') || '';
 
 // ── INITIALISIERUNG ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  if (userName) {
-    closenNameModal();
-  }
-  updateUserDisplay();
-  ladeArtikel();
-  ladeStatistik();
-  ladeKatalog();
-  ladeLagerbestand();
+  pruefSession();
 
-  // Enter-Taste im Name-Modal
+  // Enter-Taste im Login-Modal
   document.getElementById('user-name-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('user-passwort-input').focus();
+  });
+  document.getElementById('user-passwort-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') setUserName();
   });
 
@@ -29,21 +25,22 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     setUserName();
   });
-  document.getElementById('erledigt-name-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') bestaetigeErledigt();
-  });
-
   // Katalog-Dropdown
   const fName = document.getElementById('f-name');
+  const fNummer = document.getElementById('f-nummer');
   const fNameClear = document.getElementById('f-name-clear');
   fName.addEventListener('input', () => {
-    zeigKatalogDropdown(fName.value.trim());
+    zeigKatalogDropdown(fName.value.trim(), 'f-name');
     fNameClear.classList.toggle('hidden', !fName.value);
   });
-  fName.addEventListener('focus', () => { if (fName.value.trim()) zeigKatalogDropdown(fName.value.trim()); });
+  fName.addEventListener('focus', () => { if (fName.value.trim()) zeigKatalogDropdown(fName.value.trim(), 'f-name'); });
   fName.addEventListener('blur', () => setTimeout(versteckeKatalogDropdown, 200));
   fNameClear.addEventListener('mousedown', e => { e.preventDefault(); clearArtikelName(); });
   fNameClear.addEventListener('touchend', e => { e.preventDefault(); clearArtikelName(); });
+
+  fNummer.addEventListener('input', () => zeigKatalogDropdown(fNummer.value.trim(), 'f-nummer'));
+  fNummer.addEventListener('focus', () => { if (fNummer.value.trim()) zeigKatalogDropdown(fNummer.value.trim(), 'f-nummer'); });
+  fNummer.addEventListener('blur', () => setTimeout(versteckeKatalogDropdown, 200));
 
   // Form-Felder: Enter -> Submit
   ['f-name','f-nummer','f-lagerort','f-notiz'].forEach(id => {
@@ -69,25 +66,31 @@ async function ladeKatalog() {
   } catch {}
 }
 
-function zeigKatalogDropdown(val) {
+function zeigKatalogDropdown(val, feldId = 'f-name') {
   if (!val) { versteckeKatalogDropdown(); return; }
   const treffer = katalog.filter(k =>
-    k.artikelname.toLowerCase().includes(val.toLowerCase())
+    feldId === 'f-nummer'
+      ? (k.artikelnummer || '').toLowerCase().includes(val.toLowerCase())
+      : k.artikelname.toLowerCase().includes(val.toLowerCase())
   ).slice(0, 8);
   if (treffer.length === 0) { versteckeKatalogDropdown(); return; }
 
   let dd = document.getElementById('katalog-dropdown');
+  const anker = document.getElementById(feldId).closest('.form-group');
   if (!dd) {
     dd = document.createElement('div');
     dd.id = 'katalog-dropdown';
     dd.className = 'katalog-dropdown';
-    document.getElementById('f-name').closest('.form-group').appendChild(dd);
+    anker.appendChild(dd);
+  } else if (dd.parentElement !== anker) {
+    anker.appendChild(dd);
   }
 
   dd.innerHTML = treffer.map((k, i) =>
     `<div class="katalog-dropdown-item" data-i="${i}">
       <span class="kd-name">${escHtml(k.artikelname)}</span>
       <span class="kd-meta">${escHtml(k.artikelnummer)}${k.lagerort ? ' · ' + escHtml(k.lagerort) : ''}</span>
+      ${k.anmerkung ? `<span class="kd-anmerkung">${formatAnmerkung(k.anmerkung)}</span>` : ''}
     </div>`
   ).join('');
 
@@ -108,10 +111,29 @@ function zeigKatalogDropdown(val) {
 
 function waehlKatalogEintrag(k) {
   document.getElementById('f-name').value = k.artikelname;
+  document.getElementById('f-name-clear').classList.remove('hidden');
   document.getElementById('f-nummer').value = k.artikelnummer || '';
   document.getElementById('f-lagerort').value = k.lagerort || '';
+  zeigAnmerkung(k.anmerkung || '');
   versteckeKatalogDropdown();
   document.getElementById('f-notiz').focus();
+}
+
+function formatAnmerkung(text) {
+  const teile = text.split('--').map(t => t.trim()).filter(t => t);
+  return teile.map(escHtml).join('<br>');
+}
+
+function zeigAnmerkung(text) {
+  const box = document.getElementById('anmerkung-info');
+  const span = document.getElementById('anmerkung-text');
+  if (text && text.trim()) {
+    span.innerHTML = formatAnmerkung(text);
+    box.classList.remove('hidden');
+  } else {
+    box.classList.add('hidden');
+    span.innerHTML = '';
+  }
 }
 
 function versteckeKatalogDropdown() {
@@ -124,21 +146,77 @@ function clearArtikelName() {
   fName.value = '';
   document.getElementById('f-name-clear').classList.add('hidden');
   versteckeKatalogDropdown();
+  zeigAnmerkung('');
   fName.focus();
 }
 
-// ── NUTZERNAME ──────────────────────────────────────────────
-function setUserName() {
-  const val = document.getElementById('user-name-input').value.trim();
-  if (!val) {
-    document.getElementById('user-name-input').focus();
-    shake(document.getElementById('user-name-input'));
+// ── LOGIN ────────────────────────────────────────────────────
+async function pruefSession() {
+  try {
+    const res = await fetch('/api/artikel');
+    if (res.status === 401) {
+      zeigeLoginModal();
+    } else {
+      alleArtikel = await res.json();
+      if (userName) closenNameModal();
+      else zeigeLoginModal();
+      aktualisiereLagerorte();
+      renderListe();
+      ladeStatistik();
+      ladeKatalog();
+      ladeLagerbestand();
+      updateUserDisplay();
+    }
+  } catch {
+    zeigeLoginModal();
+  }
+}
+
+function zeigeLoginModal() {
+  document.getElementById('name-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('user-name-input').focus(), 50);
+}
+
+async function setUserName() {
+  const name = document.getElementById('user-name-input').value.trim();
+  const pw   = document.getElementById('user-passwort-input').value;
+  if (!name) { shake(document.getElementById('user-name-input')); return; }
+  if (!pw)   { shake(document.getElementById('user-passwort-input')); return; }
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passwort: pw }),
+    });
+    if (!res.ok) {
+      shake(document.getElementById('user-passwort-input'));
+      document.getElementById('user-passwort-input').value = '';
+      toast('Falsches Passwort', 'error');
+      return;
+    }
+  } catch {
+    toast('Verbindungsfehler', 'error');
     return;
   }
-  userName = val;
+
+  userName = name;
   localStorage.setItem('lager_username', userName);
   closenNameModal();
   updateUserDisplay();
+  ladeArtikel();
+  ladeStatistik();
+  ladeKatalog();
+  ladeLagerbestand();
+}
+
+async function logout() {
+  await fetch('/api/logout', { method: 'POST' });
+  userName = '';
+  localStorage.removeItem('lager_username');
+  alleArtikel = [];
+  renderListe();
+  zeigeLoginModal();
 }
 
 function closenNameModal() {
@@ -151,6 +229,7 @@ function updateUserDisplay() {
 
 function changeUser() {
   document.getElementById('user-name-input').value = userName;
+  document.getElementById('user-passwort-input').value = '';
   document.getElementById('name-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('user-name-input').focus(), 50);
 }
@@ -298,10 +377,8 @@ async function submitArtikel() {
 // ── ERLEDIGT-MODAL ───────────────────────────────────────────
 function openErledigtModal(id) {
   pendingErledigtId = id;
-  const input = document.getElementById('erledigt-name-input');
-  input.value = userName;
+  document.getElementById('erledigt-frage').textContent = `Ware aufgefüllt, ${userName}?`;
   document.getElementById('erledigt-modal').classList.remove('hidden');
-  setTimeout(() => input.select(), 50);
 }
 
 function closeErledigtModal() {
@@ -310,20 +387,13 @@ function closeErledigtModal() {
 }
 
 async function bestaetigeErledigt() {
-  const name = document.getElementById('erledigt-name-input').value.trim();
-  if (!name) { shake(document.getElementById('erledigt-name-input')); return; }
   if (!pendingErledigtId) return;
-
-  // Name merken
-  userName = name;
-  localStorage.setItem('lager_username', userName);
-  updateUserDisplay();
 
   try {
     const res = await fetch(`/api/artikel/${pendingErledigtId}/erledigt`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ erledigt_von: name }),
+      body: JSON.stringify({ erledigt_von: userName }),
     });
     if (!res.ok) throw new Error();
     closeErledigtModal();
@@ -352,6 +422,48 @@ async function loescheArtikel(id, name) {
     toast(`"${name}" geloescht`, 'info');
   } catch {
     toast('Fehler beim Loeschen', 'error');
+  }
+}
+
+// ── ETIKETTEN ────────────────────────────────────────────────
+let pendingEtikettenArtikel = null;
+
+function openEtikettenModal(id) {
+  pendingEtikettenArtikel = alleArtikel.find(a => a.id === id);
+  if (!pendingEtikettenArtikel) return;
+  document.getElementById('etiketten-artikel-info').textContent =
+    `${pendingEtikettenArtikel.artikelname}${pendingEtikettenArtikel.artikelnummer ? ' · ' + pendingEtikettenArtikel.artikelnummer : ''}`;
+  document.getElementById('etiketten-menge').value = '';
+  document.getElementById('etiketten-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('etiketten-menge').focus(), 50);
+}
+
+function closeEtikettenModal() {
+  pendingEtikettenArtikel = null;
+  document.getElementById('etiketten-modal').classList.add('hidden');
+}
+
+async function bestaetigeEtiketten() {
+  const menge = document.getElementById('etiketten-menge').value.trim();
+  if (!menge) { shake(document.getElementById('etiketten-menge')); return; }
+  const a = pendingEtikettenArtikel;
+  try {
+    const res = await fetch('/api/etiketten', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        artikelname: a.artikelname,
+        artikelnummer: a.artikelnummer,
+        lagerort: a.lagerort,
+        menge,
+        gemeldet_von: userName,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    closeEtikettenModal();
+    toast('Etikettenauftrag an Vertrieb gesendet', 'success');
+  } catch {
+    toast('Fehler beim Senden', 'error');
   }
 }
 
@@ -390,9 +502,14 @@ function renderListe() {
   container.innerHTML = gefiltert.map(a => renderArtikelItem(a)).join('');
 }
 
+function getAnmerkung(artikelnummer) {
+  if (!artikelnummer || !(artikelnummer in lagerbestand)) return '';
+  return lagerbestand[artikelnummer].anmerkung || '';
+}
+
 function bestandBadge(artikelnummer) {
   if (!artikelnummer || !(artikelnummer in lagerbestand)) return '';
-  const b = lagerbestand[artikelnummer];
+  const b = lagerbestand[artikelnummer].bestand;
   const cls = b === 0 ? 'bestand-leer' : b <= 3 ? 'bestand-niedrig' : 'bestand-ok';
   return `<span class="badge-bestand ${cls}">Bestand: ${b}</span>`;
 }
@@ -402,9 +519,10 @@ function renderArtikelItem(a) {
   const erstelltDatum = formatDatum(a.erstellt_am);
   const erledigtDatum = a.erledigt_am ? formatDatum(a.erledigt_am) : '';
 
-  const checkIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
-  const undoIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
-  const trashIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+  const checkIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const undoIcon     = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`;
+  const trashIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+  const etikettenIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
   const locIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
   const userIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
   const timeIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
@@ -421,6 +539,8 @@ function renderArtikelItem(a) {
       <div class="artikel-body">
         <div class="artikel-top">
           <span class="artikel-name">${escHtml(a.artikelname)}</span>
+        </div>
+        <div class="artikel-sub">
           ${a.artikelnummer ? `<span class="artikel-nummer">${escHtml(a.artikelnummer)}</span>` : ''}
           <span class="badge-menge">${escHtml(a.einheit)}</span>
           ${!erledigt ? bestandBadge(a.artikelnummer) : ''}
@@ -431,10 +551,12 @@ function renderArtikelItem(a) {
           <span class="meta-item">${timeIcon} ${erstelltDatum}</span>
         </div>
         ${a.notiz ? `<div class="notiz-text">${escHtml(a.notiz)}</div>` : ''}
+        ${(() => { const anm = getAnmerkung(a.artikelnummer); return anm ? `<div class="anmerkung-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>${formatAnmerkung(anm)}</span></div>` : ''; })()}
         ${erledigt ? `<div class="erledigt-info">${checkFillIcon} Aufgefuellt von ${escHtml(a.erledigt_von)} &mdash; ${erledigtDatum}</div>` : ''}
       </div>
 
       <div class="artikel-actions">
+        ${!erledigt ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
         ${erledigt ? `<button class="action-btn" title="Wieder oeffnen" onclick="markiereOffen(${a.id})">${undoIcon}</button>` : ''}
         <button class="action-btn delete" title="Loeschen" onclick="loescheArtikel(${a.id}, '${escHtml(a.artikelname).replace(/'/g,"\\'")}')">
           ${trashIcon}

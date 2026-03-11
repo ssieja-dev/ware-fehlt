@@ -13,12 +13,46 @@ process.on('uncaughtException', err => {
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+const PASSWORT = '02154';
+
+app.use(session({
+  secret: 'ware-fehlt-secret-2024',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 8 * 60 * 60 * 1000 }
+}));
+
+app.use(express.json());
+
+// Auth-Middleware für alle API-Routen außer /api/login
+app.use('/api', (req, res, next) => {
+  if (req.path === '/login') return next();
+  if (req.path.startsWith('/etiketten')) return next(); // Vertrieb: kein Login nötig
+  if (req.session?.angemeldet) return next();
+  res.status(401).json({ error: 'Nicht angemeldet' });
+});
+
+app.post('/api/login', (req, res) => {
+  if (req.body.passwort === PASSWORT) {
+    req.session.angemeldet = true;
+    res.json({ ok: true });
+  } else {
+    res.status(401).json({ error: 'Falsches Passwort' });
+  }
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ ok: true });
+});
 
 // Im pkg-Build liegt lager.json neben der .exe, sonst im Projektordner
 const DB_FILE = process.pkg
@@ -42,7 +76,6 @@ function speichereDB(db) {
 let db = ladeDB();
 
 // ── Middleware ─────────────────────────────────────────────
-app.use(express.json());
 const PUBLIC_DIR = process.pkg
   ? path.join(path.dirname(process.execPath), 'public')
   : path.join(__dirname, 'public');
@@ -123,21 +156,57 @@ app.delete('/api/artikel/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// Artikelkatalog aus CSV
+// Artikelkatalog aus CSV (unterstützt mehrzeilige gequotete Felder)
 function parseCSV(content) {
-  const lines = content.split(/\r?\n/);
-  if (lines.length === 0) return [];
-  const header = lines[0];
-  const delimiter = header.includes('\t') ? '\t' : header.includes(';') ? ';' : ',';
-  const headers = header.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+  const firstLine = content.split(/\r?\n/)[0] || '';
+  const delimiter = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ',';
+
+  // Tokenizer: zerlegt den gesamten CSV-Text korrekt inkl. "..."-Felder mit Zeilenumbrüchen
+  function tokenize(text) {
+    const rows = [];
+    let row = [];
+    let i = 0;
+    while (i < text.length) {
+      if (text[i] === '"') {
+        // gequotetes Feld
+        let val = '';
+        i++; // öffnendes "
+        while (i < text.length) {
+          if (text[i] === '"' && text[i + 1] === '"') { val += '"'; i += 2; }
+          else if (text[i] === '"') { i++; break; }
+          else { val += text[i++]; }
+        }
+        row.push(val);
+        // überspringt Delimiter oder Zeilenende nach dem schließenden "
+        if (text[i] === delimiter) i++;
+        else if (text[i] === '\r') { i++; if (text[i] === '\n') i++; rows.push(row); row = []; }
+        else if (text[i] === '\n') { i++; rows.push(row); row = []; }
+      } else {
+        // ungequotetes Feld
+        let val = '';
+        while (i < text.length && text[i] !== delimiter && text[i] !== '\n' && text[i] !== '\r') {
+          val += text[i++];
+        }
+        row.push(val.trim());
+        if (text[i] === delimiter) i++;
+        else if (text[i] === '\r') { i++; if (text[i] === '\n') i++; rows.push(row); row = []; }
+        else if (text[i] === '\n') { i++; rows.push(row); row = []; }
+      }
+    }
+    if (row.length) rows.push(row);
+    return rows;
+  }
+
+  const rows = tokenize(content);
+  if (rows.length === 0) return [];
+  const headers = rows[0].map(h => h.replace(/^"|"$/g, '').toLowerCase());
   const result = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+  for (let i = 1; i < rows.length; i++) {
+    const values = rows[i];
+    if (!values.some(v => v)) continue;
     const obj = {};
-    headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
-    if (Object.values(obj).some(v => v)) result.push(obj);
+    headers.forEach((h, idx) => { obj[h] = values[idx] !== undefined ? values[idx] : ''; });
+    result.push(obj);
   }
   return result;
 }
@@ -174,7 +243,8 @@ function ladeBestand() {
       const raw = (e.bestand || e.lagerbestand || e.verfuegbar || e['verfügbar'] ||
         e['lagerbestand lager [im hasseldamm]'] || '0').replace(',', '.');
       const bestand = parseFloat(raw) || 0;
-      if (nr) neu[nr] = bestand;
+      const anmerkung = (e.anmerkung || '').trim();
+      if (nr) neu[nr] = { bestand, anmerkung };
     }
     bestandMap = neu;
     io.emit('lagerbestand_update', bestandMap);
@@ -202,6 +272,74 @@ app.post('/api/lagerbestand/upload', (req, res) => {
       res.status(500).json({ ok: false, error: e.message });
     }
   });
+});
+
+// ── Etiketten-Aufträge ─────────────────────────────────────
+const ETIKETTEN_FILE = process.pkg
+  ? path.join(path.dirname(process.execPath), 'etiketten.json')
+  : path.join(__dirname, 'etiketten.json');
+
+function ladeEtikettenDB() {
+  try {
+    if (fs.existsSync(ETIKETTEN_FILE)) return JSON.parse(fs.readFileSync(ETIKETTEN_FILE, 'utf8'));
+  } catch {}
+  return { eintraege: [], nextId: 1 };
+}
+function speichereEtikettenDB(db) {
+  fs.writeFileSync(ETIKETTEN_FILE, JSON.stringify(db, null, 2), 'utf8');
+}
+let etikettenDB = ladeEtikettenDB();
+
+app.get('/api/etiketten', (req, res) => {
+  const sorted = [...etikettenDB.eintraege].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'offen' ? -1 : 1;
+    return new Date(b.erstellt_am) - new Date(a.erstellt_am);
+  });
+  res.json(sorted);
+});
+
+app.post('/api/etiketten', (req, res) => {
+  const { artikelname, artikelnummer, lagerort, menge, gemeldet_von } = req.body;
+  if (!artikelname?.trim()) return res.status(400).json({ error: 'Pflichtfelder fehlen' });
+  const eintrag = {
+    id: etikettenDB.nextId++,
+    artikelname: artikelname.trim(),
+    artikelnummer: (artikelnummer || '').trim(),
+    lagerort: (lagerort || '').trim(),
+    menge: (menge || '').toString().trim(),
+    gemeldet_von: (gemeldet_von || '').trim(),
+    erstellt_am: new Date().toISOString(),
+    status: 'offen',
+    erledigt_von: null,
+    erledigt_am: null,
+  };
+  etikettenDB.eintraege.push(eintrag);
+  speichereEtikettenDB(etikettenDB);
+  io.emit('etikett_neu', eintrag);
+  res.json(eintrag);
+});
+
+app.patch('/api/etiketten/:id/erledigt', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { erledigt_von } = req.body;
+  const eintrag = etikettenDB.eintraege.find(e => e.id === id);
+  if (!eintrag) return res.status(404).json({ error: 'Nicht gefunden' });
+  eintrag.status = 'erledigt';
+  eintrag.erledigt_von = (erledigt_von || '').trim();
+  eintrag.erledigt_am = new Date().toISOString();
+  speichereEtikettenDB(etikettenDB);
+  io.emit('etikett_erledigt', eintrag);
+  res.json(eintrag);
+});
+
+app.delete('/api/etiketten/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const idx = etikettenDB.eintraege.findIndex(e => e.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Nicht gefunden' });
+  etikettenDB.eintraege.splice(idx, 1);
+  speichereEtikettenDB(etikettenDB);
+  io.emit('etikett_geloescht', { id });
+  res.json({ ok: true });
 });
 
 // Statistik
