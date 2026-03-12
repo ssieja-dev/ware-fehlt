@@ -28,24 +28,21 @@ window.addEventListener('DOMContentLoaded', () => {
     setUserName();
   });
   // Katalog-Dropdown
-  const fName = document.getElementById('f-name');
-  const fNummer = document.getElementById('f-nummer');
-  const fNameClear = document.getElementById('f-name-clear');
-  fName.addEventListener('input', () => {
-    zeigKatalogDropdown(fName.value.trim(), 'f-name');
-    fNameClear.classList.toggle('hidden', !fName.value);
+  const fArtikel = document.getElementById('f-artikel');
+  const fArtikelClear = document.getElementById('f-artikel-clear');
+  fArtikel.addEventListener('input', () => {
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-nummer').value = '';
+    zeigKatalogDropdown(fArtikel.value.trim());
+    fArtikelClear.classList.toggle('hidden', !fArtikel.value);
   });
-  fName.addEventListener('focus', () => { if (fName.value.trim()) zeigKatalogDropdown(fName.value.trim(), 'f-name'); });
-  fName.addEventListener('blur', () => setTimeout(versteckeKatalogDropdown, 200));
-  fNameClear.addEventListener('mousedown', e => { e.preventDefault(); clearArtikelName(); });
-  fNameClear.addEventListener('touchend', e => { e.preventDefault(); clearArtikelName(); });
-
-  fNummer.addEventListener('input', () => zeigKatalogDropdown(fNummer.value.trim(), 'f-nummer'));
-  fNummer.addEventListener('focus', () => { if (fNummer.value.trim()) zeigKatalogDropdown(fNummer.value.trim(), 'f-nummer'); });
-  fNummer.addEventListener('blur', () => setTimeout(versteckeKatalogDropdown, 200));
+  fArtikel.addEventListener('focus', () => { if (fArtikel.value.trim()) zeigKatalogDropdown(fArtikel.value.trim()); });
+  fArtikel.addEventListener('blur', () => setTimeout(versteckeKatalogDropdown, 200));
+  fArtikelClear.addEventListener('mousedown', e => { e.preventDefault(); clearArtikel(); });
+  fArtikelClear.addEventListener('touchend', e => { e.preventDefault(); clearArtikel(); });
 
   // Form-Felder: Enter -> Submit
-  ['f-name','f-nummer','f-lagerort','f-notiz'].forEach(id => {
+  ['f-artikel','f-lagerort','f-notiz'].forEach(id => {
     document.getElementById(id)?.addEventListener('keydown', e => {
       if (e.key === 'Enter') submitArtikel();
     });
@@ -167,17 +164,17 @@ async function ladeKatalog() {
   } catch {}
 }
 
-function zeigKatalogDropdown(val, feldId = 'f-name') {
+function zeigKatalogDropdown(val) {
   if (!val) { versteckeKatalogDropdown(); return; }
+  const lower = val.toLowerCase();
   const treffer = katalog.filter(k =>
-    feldId === 'f-nummer'
-      ? (k.artikelnummer || '').toLowerCase().includes(val.toLowerCase())
-      : k.artikelname.toLowerCase().includes(val.toLowerCase())
+    k.artikelname.toLowerCase().includes(lower) ||
+    (k.artikelnummer || '').toLowerCase().includes(lower)
   ).slice(0, 8);
   if (treffer.length === 0) { versteckeKatalogDropdown(); return; }
 
   let dd = document.getElementById('katalog-dropdown');
-  const anker = document.getElementById(feldId).closest('.form-group');
+  const anker = document.getElementById('f-artikel').closest('.form-group');
   if (!dd) {
     dd = document.createElement('div');
     dd.id = 'katalog-dropdown';
@@ -212,9 +209,9 @@ function zeigKatalogDropdown(val, feldId = 'f-name') {
 
 function waehlKatalogEintrag(k) {
   document.getElementById('f-name').value = k.artikelname;
-  document.getElementById('f-name-clear').classList.remove('hidden');
   document.getElementById('f-nummer').value = k.artikelnummer || '';
-  document.getElementById('f-nummer-clear').classList.toggle('hidden', !k.artikelnummer);
+  document.getElementById('f-artikel').value = k.artikelname + (k.artikelnummer ? ' · ' + k.artikelnummer : '');
+  document.getElementById('f-artikel-clear').classList.remove('hidden');
   document.getElementById('f-lagerort').value = k.lagerort || '';
   zeigAnmerkung(k.anmerkung || '');
   zeigBestandInfo(k.artikelnummer || '');
@@ -256,20 +253,15 @@ function versteckeKatalogDropdown() {
   if (dd) dd.style.display = 'none';
 }
 
-function clearArtikelName() {
-  const fName = document.getElementById('f-name');
-  fName.value = '';
-  document.getElementById('f-name-clear').classList.add('hidden');
+function clearArtikel() {
+  document.getElementById('f-artikel').value = '';
+  document.getElementById('f-artikel-clear').classList.add('hidden');
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-nummer').value = '';
   versteckeKatalogDropdown();
   zeigAnmerkung('');
   document.getElementById('bestand-info').classList.add('hidden');
-  fName.focus();
-}
-
-function clearArtikelNummer() {
-  document.getElementById('f-nummer').value = '';
-  document.getElementById('f-nummer-clear').classList.add('hidden');
-  document.getElementById('f-nummer').focus();
+  document.getElementById('f-artikel').focus();
 }
 
 // ── LOGIN ────────────────────────────────────────────────────
@@ -550,8 +542,8 @@ async function submitArtikel() {
   const name = document.getElementById('f-name').value.trim();
   const nummer = document.getElementById('f-nummer').value.trim();
   const lagerort = document.getElementById('f-lagerort').value.trim();
-  if (!name) { shake(document.getElementById('f-name')); return; }
-  if (!nummer) { shake(document.getElementById('f-nummer')); return; }
+  if (!name) { shake(document.getElementById('f-artikel')); return; }
+  if (!nummer) { shake(document.getElementById('f-artikel')); return; }
   if (!lagerort) { shake(document.getElementById('f-lagerort')); return; }
 
   const duplikat = alleArtikel.find(a =>
@@ -560,7 +552,7 @@ async function submitArtikel() {
   );
   if (duplikat) {
     toast(`Bereits gemeldet: "${duplikat.artikelname}"`, 'error');
-    shake(document.getElementById('f-nummer'));
+    shake(document.getElementById('f-artikel'));
     return;
   }
 
@@ -584,9 +576,11 @@ async function submitArtikel() {
     ['f-name','f-nummer','f-lagerort','f-notiz'].forEach(id => {
       document.getElementById(id).value = '';
     });
-    document.getElementById('f-name-clear').classList.add('hidden');
-    document.getElementById('f-nummer-clear').classList.add('hidden');
-    document.getElementById('f-name').focus();
+    document.getElementById('f-artikel').value = '';
+    document.getElementById('f-artikel-clear').classList.add('hidden');
+    zeigAnmerkung('');
+    document.getElementById('bestand-info').classList.add('hidden');
+    document.getElementById('f-artikel').focus();
     toast(`"${name}" gemeldet`, 'success');
   } catch {
     toast('Fehler beim Speichern', 'error');

@@ -251,16 +251,16 @@ main {
 .form-group { display: flex; flex-direction: column; gap: .35rem; position: relative; }
 .form-group.full-width { grid-column: 1 / -1; }
 .form-group label {
-  font-size: .78rem; font-weight: 500;
+  font-size: .84rem; font-weight: 500;
   color: var(--text2); text-transform: uppercase; letter-spacing: .05em;
 }
 .form-group.required label::after { content: ' *'; color: var(--orange); }
 .form-group input,
 .form-group select {
-  padding: .65rem .9rem;
+  padding: .85rem 1rem;
   background: var(--bg3); border: 1px solid var(--border);
   border-radius: var(--radius-sm); color: var(--text);
-  font-size: .9rem; font-family: inherit; outline: none;
+  font-size: 1rem; font-family: inherit; outline: none;
   transition: border-color .2s, box-shadow .2s;
 }
 .form-group input:focus,

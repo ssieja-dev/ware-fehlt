@@ -171,23 +171,16 @@
       </div>
       <div id="form-body">
         <div class="form-grid">
-          <div class="form-group required">
-            <label>Artikelname</label>
+          <div class="form-group required full-width">
+            <label>Artikel</label>
             <div class="input-wrap">
-              <input type="text" id="f-name" placeholder="z.B. Rinderlefzen" maxlength="100" autocomplete="off" />
-              <button type="button" id="f-name-clear" class="input-clear hidden" tabindex="-1">
+              <input type="text" id="f-artikel" placeholder="Artikelname oder Artikelnummer" maxlength="150" autocomplete="off" />
+              <button type="button" id="f-artikel-clear" class="input-clear hidden" tabindex="-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-          </div>
-          <div class="form-group required">
-            <label>Artikelnummer</label>
-            <div class="input-wrap">
-              <input type="text" id="f-nummer" placeholder="z.B. 21-4270-002" maxlength="50" autocomplete="off" oninput="document.getElementById('f-nummer-clear').classList.toggle('hidden',!this.value)" />
-              <button type="button" id="f-nummer-clear" class="input-clear hidden" tabindex="-1" onclick="clearArtikelNummer()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
+            <input type="hidden" id="f-name" />
+            <input type="hidden" id="f-nummer" />
           </div>
           <div class="form-group required">
             <label>Lagerort</label>
