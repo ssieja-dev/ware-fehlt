@@ -3,45 +3,26 @@
 const socket = io();
 let alleEtiketten = [];
 let aktuellerFilter = 'offen';
-let userName = localStorage.getItem('etiketten_username') || '';
+let userName = '';
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const backBtn = document.getElementById('portal-back-btn');
   if (backBtn) backBtn.href = `http://${window.location.hostname}:3003`;
 
-  if (!userName) {
-    document.getElementById('name-modal').classList.remove('hidden');
-    setTimeout(() => document.getElementById('name-input').focus(), 50);
-  } else {
-    zeigeNameBar();
-    ladeEtiketten();
-  }
+  try {
+    const res = await fetch('/api/me');
+    if (res.ok) {
+      const user = await res.json();
+      userName = user.name || '';
+    }
+  } catch {}
 
-  document.getElementById('name-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') setName();
-  });
-  document.getElementById('name-btn').addEventListener('touchend', e => {
-    e.preventDefault(); setName();
-  });
-});
-
-function setName() {
-  const val = document.getElementById('name-input').value.trim();
-  if (!val) { shake(document.getElementById('name-input')); return; }
-  userName = val;
-  localStorage.setItem('etiketten_username', userName);
-  document.getElementById('name-modal').classList.add('hidden');
   zeigeNameBar();
   ladeEtiketten();
-}
-
-function changeName() {
-  document.getElementById('name-input').value = userName;
-  document.getElementById('name-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('name-input').focus(), 50);
-}
+});
 
 function zeigeNameBar() {
+  if (!userName) return;
   document.getElementById('name-display').textContent = userName;
   document.getElementById('name-bar').classList.remove('hidden');
 }
