@@ -4,6 +4,7 @@ const socket = io();
 let alleArtikel = [];
 let katalog = [];
 let lagerbestand = {};
+let lagerorteExtra = {};
 let aktuellerFilter = 'offen';
 let pendingErledigtId = null;
 let userName = localStorage.getItem('lager_username') || '';
@@ -157,6 +158,14 @@ async function ladeLagerbestand() {
   } catch {}
 }
 
+async function ladeLagerorteExtra() {
+  try {
+    const res = await fetch('/api/lagerorte-extra');
+    lagerorteExtra = await res.json();
+    renderListe();
+  } catch {}
+}
+
 async function ladeKatalog() {
   try {
     const res = await fetch('/api/katalog');
@@ -291,6 +300,7 @@ async function pruefSession() {
       ladeStatistik();
       ladeKatalog();
       ladeLagerbestand();
+      ladeLagerorteExtra();
       ladeEtikettenFertig();
       updateUserDisplay();
     }
@@ -335,6 +345,7 @@ async function setUserName() {
   ladeStatistik();
   ladeKatalog();
   ladeLagerbestand();
+  ladeLagerorteExtra();
   ladeEtikettenFertig();
 }
 
@@ -815,7 +826,7 @@ function bestandBadge(artikelnummer) {
 
 function renderArtikelItem(a) {
   const erledigt = a.status === 'erledigt';
-  const hatEtiketten = a.status === 'etiketten';
+  const hatEtiketten = a.etiketten_bestellt === true;
   const erstelltDatum = formatDatum(a.erstellt_am);
   const erledigtDatum = a.erledigt_am ? formatDatum(a.erledigt_am) : '';
 
@@ -850,6 +861,13 @@ function renderArtikelItem(a) {
           <span class="meta-item">${userIcon} ${escHtml(a.gemeldet_von)}</span>
           <span class="meta-item">${timeIcon} ${erstelltDatum}</span>
         </div>
+        ${(() => {
+          const extra = a.artikelnummer ? lagerorteExtra[a.artikelnummer] : null;
+          if (!extra) return '';
+          const rv = extra.reservelager ? `<span class="meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2"/></svg> ${escHtml(extra.reservelager)}</span>` : '';
+          const sp = extra.stellplaetze && extra.stellplaetze.length > 0 ? `<span class="meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> ${extra.stellplaetze.map(escHtml).join(', ')}</span>` : '';
+          return (rv || sp) ? `<div class="artikel-meta artikel-meta-lager">${rv}${sp}</div>` : '';
+        })()}
         ${a.notiz ? `<div class="notiz-text">${escHtml(a.notiz)}</div>` : ''}
         ${(() => { const anm = getAnmerkung(a.artikelnummer); return anm ? `<div class="anmerkung-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>${formatAnmerkung(anm)}</span></div>` : ''; })()}
         ${hatEtiketten ? `<div class="etiketten-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Etiketten bestellt${a.etiketten_menge ? ` &mdash; <strong>${escHtml(a.etiketten_menge)} Stk.</strong>` : ''}</div>` : ''}
@@ -858,7 +876,7 @@ function renderArtikelItem(a) {
       </div>
 
       <div class="artikel-actions">
-        ${!erledigt && !hatEtiketten ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
+        ${!erledigt ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
         ${erledigt ? `<button class="action-btn" title="Wieder oeffnen" onclick="markiereOffen(${a.id})">${undoIcon}</button>` : ''}
         <button class="action-btn delete" title="Loeschen" onclick="loescheArtikel(${a.id}, '${escHtml(a.artikelname).replace(/'/g,"\\'")}')">
           ${trashIcon}

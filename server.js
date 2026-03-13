@@ -130,7 +130,7 @@ let db = ladeDB();
 // ── Portal-Token Login ──────────────────────────────────────
 function validierePortalToken(token) {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:3003/api/app-token/${token}`, res => {
+    http.get(`http://localhost:4003/api/app-token/${token}`, res => {
       let data = '';
       res.on('data', d => data += d);
       res.on('end', () => {
@@ -233,7 +233,7 @@ app.patch('/api/artikel/:id/etiketten', (req, res) => {
   const id = parseInt(req.params.id);
   const artikel = db.artikel.find(a => a.id === id);
   if (!artikel) return res.status(404).json({ error: 'Nicht gefunden' });
-  artikel.status = 'etiketten';
+  artikel.etiketten_bestellt = true;
   artikel.etiketten_menge = (req.body.menge || '').toString().trim();
   speichereDB(db);
   io.emit('artikel_etiketten', artikel);
@@ -354,6 +354,33 @@ setInterval(ladeBestand, 5 * 60 * 1000);
 
 app.get('/api/lagerbestand', (req, res) => res.json(bestandMap));
 
+app.get('/api/lagerorte-extra', (req, res) => {
+  try {
+    const reservelagerFile = path.join(__dirname, '..', 'artikel-lagerorte', 'reservelager.csv');
+    const palettenFile     = path.join(__dirname, '..', 'artikel-lagerorte', 'paletten-data.json');
+    const result = {};
+
+    if (fs.existsSync(reservelagerFile)) {
+      fs.readFileSync(reservelagerFile, 'utf8').split('\n').slice(1).forEach(line => {
+        const [nr, wert] = line.split(';').map(s => s.trim());
+        if (nr && wert) { if (!result[nr]) result[nr] = {}; result[nr].reservelager = wert; }
+      });
+    }
+    if (fs.existsSync(palettenFile)) {
+      const pd = JSON.parse(fs.readFileSync(palettenFile, 'utf8'));
+      Object.entries(pd).forEach(([nr, eintraege]) => {
+        if (!Array.isArray(eintraege) || eintraege.length === 0) return;
+        if (!result[nr]) result[nr] = {};
+        result[nr].stellplaetze = eintraege.map(e => e.stellplatz).filter(Boolean);
+      });
+    }
+    res.json(result);
+  } catch (e) {
+    res.json({});
+  }
+});
+
+
 app.post('/api/lagerbestand/upload', (req, res) => {
   const chunks = [];
   req.on('data', c => chunks.push(c));
@@ -443,6 +470,15 @@ app.patch('/api/etiketten/:id/erledigt', (req, res) => {
     }
   }
 
+  res.json(eintrag);
+});
+
+app.patch('/api/etiketten/:id/abschliessen', (req, res) => {
+  const id = parseInt(req.params.id);
+  const eintrag = etikettenDB.eintraege.find(e => e.id === id);
+  if (!eintrag) return res.status(404).json({ error: 'Nicht gefunden' });
+  eintrag.abgeschlossen = true;
+  speichereEtikettenDB(etikettenDB);
   res.json(eintrag);
 });
 

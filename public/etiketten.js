@@ -198,7 +198,7 @@ function renderListe() {
           ${e.artikelnummer ? `<span class="etikett-nummer">${escHtml(e.artikelnummer)}</span>` : ''}
           <div><span class="etikett-menge">${escHtml(e.menge)} Etiketten</span></div>
           ${e.typ === 'mhd' ? `<div style="margin-top:.4rem;"><span style="background:#fef9c3;border:1px solid #fde047;color:#854d0e;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;letter-spacing:.04em;display:inline-block;">MHD am Artikel</span></div>` : ''}
-          ${e.typ === 'lieferung' && e.lieferung ? `<div style="margin-top:.4rem;"><span style="background:#f1f5f9;border:1px solid #cbd5e1;color:#374151;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;display:inline-block;">📦 ${escHtml(e.lieferung)}</span></div>` : ''}
+          ${(e.typ === 'lieferung' || e.typ === 'lieferung-datum') && e.lieferung ? `<div style="margin-top:.4rem;"><span style="background:#f1f5f9;border:1px solid #cbd5e1;color:#374151;border-radius:8px;padding:.3rem .75rem;font-size:1.15rem;font-weight:700;display:inline-block;">📦 ${escHtml(e.lieferung)}</span></div>` : ''}
           ${erledigt ? `<div class="erledigt-badge">${doneIcon} Erledigt von ${escHtml(e.erledigt_von)} &mdash; ${formatDatum(e.erledigt_am)}</div>` : ''}
           <div class="etikett-meta">
             ${e.lagerort ? `<span>${locIcon} ${escHtml(e.lagerort)}</span>` : ''}
