@@ -128,9 +128,12 @@ function speichereDB(db) {
 let db = ladeDB();
 
 // ── Portal-Token Login ──────────────────────────────────────
+const PORTAL_PORT = process.env.PORTAL_PORT || 3003;
+const ETIKETTEN_PORT = process.env.ETIKETTEN_PORT || 3004;
+
 function validierePortalToken(token) {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:4003/api/app-token/${token}`, res => {
+    http.get(`http://localhost:${PORTAL_PORT}/api/app-token/${token}`, res => {
       let data = '';
       res.on('data', d => data += d);
       res.on('end', () => {
@@ -163,6 +166,29 @@ app.get('/', async (req, res, next) => {
 app.use(express.static(PUBLIC_DIR));
 
 // ── API ────────────────────────────────────────────────────
+app.get('/api/config', (req, res) => res.json({ portalPort: PORTAL_PORT }));
+
+// Proxy: Etikettenauftrag an etiketten-bestellen weiterleiten
+app.post('/api/etikett-auftrag', (req, res) => {
+  const payload = JSON.stringify(req.body);
+  const options = {
+    hostname: 'localhost', port: ETIKETTEN_PORT, path: '/api/auftraege/intern',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+  };
+  const r = http.request(options, r2 => {
+    let data = '';
+    r2.on('data', d => data += d);
+    r2.on('end', () => {
+      if (r2.statusCode === 200) res.json(JSON.parse(data));
+      else res.status(r2.statusCode).json({ error: 'Fehler bei Etiketten-App' });
+    });
+  });
+  r.on('error', () => res.status(500).json({ error: 'Etiketten-App nicht erreichbar' }));
+  r.write(payload);
+  r.end();
+});
+
 // Alle Artikel
 app.get('/api/artikel', (req, res) => {
   const rang = { offen: 0, etiketten: 1, erledigt: 2 };
@@ -371,7 +397,7 @@ app.get('/api/lagerorte-extra', (req, res) => {
       Object.entries(pd).forEach(([nr, eintraege]) => {
         if (!Array.isArray(eintraege) || eintraege.length === 0) return;
         if (!result[nr]) result[nr] = {};
-        result[nr].stellplaetze = eintraege.map(e => e.stellplatz).filter(Boolean);
+        result[nr].stellplaetze = eintraege.filter(e => e.stellplatz).map(e => ({ stellplatz: e.stellplatz, menge: e.menge || 0 }));
       });
     }
     res.json(result);
@@ -490,6 +516,19 @@ app.delete('/api/etiketten/:id', (req, res) => {
   speichereEtikettenDB(etikettenDB);
   io.emit('etikett_geloescht', { id });
   res.json({ ok: true });
+});
+
+// Palettenlieferungen
+const PALETTEN_LIEF_FILE      = path.join(__dirname, '..', 'palettenlieferungen', 'lieferungen.json');
+const PALETTEN_LIEFERANT_FILE = path.join(__dirname, '..', 'palettenlieferungen', 'lieferanten.json');
+app.get('/api/palettenlieferungen', (req, res) => {
+  try {
+    const { lieferungen } = JSON.parse(fs.readFileSync(PALETTEN_LIEF_FILE, 'utf8'));
+    const lieferanten = JSON.parse(fs.readFileSync(PALETTEN_LIEFERANT_FILE, 'utf8'));
+    const map = Object.fromEntries(lieferanten.map(l => [l.kuerzel, l.name]));
+    const result = lieferungen.map(l => ({ ...l, lieferantName: map[l.lieferant] || l.lieferant }));
+    res.json({ lieferungen: result });
+  } catch { res.status(500).json({ error: 'Fehler beim Lesen' }); }
 });
 
 // Statistik

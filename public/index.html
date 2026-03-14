@@ -58,8 +58,43 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
       </div>
       <h2>Etiketten bestellen</h2>
-      <p id="etiketten-artikel-info" style="font-weight:600;color:#374151;margin-bottom:1rem;"></p>
-      <div class="mengen-stepper">
+      <p id="etiketten-artikel-info" style="font-weight:600;color:#374151;margin-bottom:.5rem;"></p>
+
+      <!-- Typ -->
+      <div class="et-toggle">
+        <button class="et-toggle-btn active" id="et-toggle-lieferung" onclick="setEtAuftragTyp('lieferung')">Lieferung</button>
+        <button class="et-toggle-btn" id="et-toggle-mhd" onclick="setEtAuftragTyp('mhd')">MHD am Artikel</button>
+        <button class="et-toggle-btn" id="et-toggle-ld" onclick="setEtAuftragTyp('lieferung-datum')">Nur Datum</button>
+      </div>
+
+      <!-- Lieferung: Nummern-Lookup -->
+      <div id="et-feld-lieferung" class="et-feld">
+        <div class="lieferung-panel">
+          <div class="lieferung-datum-row">
+            <input type="number" id="et-lief-nr" placeholder="Lieferungs-Nr., z. B. 219" min="1" oninput="sucheEtLieferung()" />
+            <span class="kw-badge" id="et-lief-badge" style="opacity:.4;">–</span>
+          </div>
+          <div class="lieferung-preview" id="et-lieferung-preview">–</div>
+        </div>
+        <input type="hidden" id="etiketten-lieferung" />
+      </div>
+
+      <!-- Lieferung-Datum: Jahrbuttons + Datum -->
+      <div id="et-feld-ld" class="et-feld hidden">
+        <div class="year-btns">
+          <button class="year-btn" id="et-year-btn-2026" onclick="setEtLDJahr(2026)">2026</button>
+          <button class="year-btn" id="et-year-btn-2027" onclick="setEtLDJahr(2027)">2027</button>
+          <button class="year-btn" id="et-year-btn-2028" onclick="setEtLDJahr(2028)">2028</button>
+        </div>
+        <div class="lieferung-datum-row">
+          <input type="date" id="et-ld-datum" oninput="updateEtLDPreview()" />
+          <span class="kw-badge" id="et-ld-badge" style="opacity:.4;">kein Datum</span>
+        </div>
+        <input type="hidden" id="et-ld" />
+      </div>
+
+      <!-- Menge -->
+      <div class="mengen-stepper" style="margin:.75rem 0 .25rem;">
         <button class="stepper-btn"
           onmousedown="stepperStart(-1)" onmouseup="stepperStop()" onmouseleave="stepperStop()"
           ontouchstart="stepperStart(-1)" ontouchend="stepperStop()">−</button>
@@ -67,46 +102,18 @@
         <button class="stepper-btn"
           onmousedown="stepperStart(1)" onmouseup="stepperStop()" onmouseleave="stepperStop()"
           ontouchstart="stepperStart(1)" ontouchend="stepperStop()">+</button>
-        <button class="stepper-confirm" onclick="bestaetigeEtiketten()" title="Bestellen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
       </div>
 
-      <div class="et-toggle">
-        <button class="et-toggle-btn active" id="toggle-lieferung" onclick="setEtikettenTyp('lieferung')">Lieferung</button>
-        <button class="et-toggle-btn" id="toggle-mhd" onclick="setEtikettenTyp('mhd')">MHD am Artikel</button>
-      </div>
-      <div id="et-feld-lieferung" class="et-feld">
-        <div class="lieferung-panel">
-          <div class="lieferung-datum-row">
-            <input type="date" id="et-lieferung-datum" oninput="updateEtLieferungPreview()" />
-            <span class="kw-badge" id="et-kw-badge">KW –</span>
-          </div>
-          <div class="pickers-row">
-            <div class="picker-wrap">
-              <div class="picker-label">Nummer</div>
-              <div class="drum-picker" id="et-picker-nummer">
-                <div class="picker-items" id="et-picker-nummer-items"></div>
-                <div class="picker-fade-top"></div>
-                <div class="picker-fade-bottom"></div>
-                <div class="picker-selector"></div>
-              </div>
-            </div>
-            <div class="picker-wrap">
-              <div class="picker-label">Lieferant</div>
-              <div class="drum-picker" id="et-picker-lieferant">
-                <div class="picker-items" id="et-picker-lieferant-items"></div>
-                <div class="picker-fade-top"></div>
-                <div class="picker-fade-bottom"></div>
-                <div class="picker-selector"></div>
-              </div>
-            </div>
-          </div>
-          <div class="lieferung-preview" id="et-lieferung-preview">–</div>
-        </div>
-        <input type="hidden" id="etiketten-lieferung" />
+      <!-- Größe -->
+      <div class="et-toggle" style="margin-bottom:.75rem;">
+        <button class="et-toggle-btn" id="et-toggle-klein" onclick="setEtAuftragGroesse('klein')">KLEIN</button>
+        <button class="et-toggle-btn" id="et-toggle-gross" onclick="setEtAuftragGroesse('gross')">GROSS</button>
       </div>
 
+      <button class="btn-submit" style="width:100%;justify-content:center;" onclick="bestaetigeEtikettenAuftrag()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="12 5 12 19"/><polyline points="5 12 12 5 19 12"/></svg>
+        Bestellen
+      </button>
       <button class="btn-secondary" style="margin-top:.5rem;" onclick="closeEtikettenModal()">Abbrechen</button>
     </div>
   </div>

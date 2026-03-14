@@ -10,7 +10,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (backBtn) backBtn.href = `http://${window.location.hostname}:3003`;
 
   try {
-    const res = await fetch('/api/me');
+    const res = await fetch('/api/portal/me');
     if (res.ok) {
       const user = await res.json();
       userName = user.name || '';
@@ -23,8 +23,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 function zeigeNameBar() {
   if (!userName) return;
-  document.getElementById('name-display').textContent = userName;
-  document.getElementById('name-bar').classList.remove('hidden');
+  document.getElementById('current-user-name').textContent = userName;
 }
 
 // ── SOCKET.IO ─────────────────────────────────────────────────
