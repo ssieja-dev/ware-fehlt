@@ -150,18 +150,21 @@ const PUBLIC_DIR = process.pkg
   : path.join(__dirname, 'public');
 
 // Portal-Token abfangen bevor statische Dateien
-app.get('/', async (req, res, next) => {
+async function handlePortalToken(req, res, next, redirectTo) {
   const token = req.query.portal_token;
   if (!token) return next();
   try {
     const user = await validierePortalToken(token);
     req.session.angemeldet = true;
     req.session.portalUser = { name: user.name };
-    res.redirect('/');
+    res.redirect(redirectTo);
   } catch {
-    res.redirect('/');
+    res.redirect(redirectTo);
   }
-});
+}
+
+app.get('/', (req, res, next) => handlePortalToken(req, res, next, '/'));
+app.get('/etiketten.html', (req, res, next) => handlePortalToken(req, res, next, '/etiketten.html'));
 
 app.use(express.static(PUBLIC_DIR));
 
