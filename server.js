@@ -88,6 +88,7 @@ app.use('/api', (req, res, next) => {
   if (req.path === '/login') return next();
   if (req.path.startsWith('/portal/')) return next();
   if (req.path.startsWith('/etiketten')) return next(); // Vertrieb: kein Login nötig
+  if (req.path === '/lagerbestand/upload') return next(); // BAT-Skript: kein Login nötig
   if (req.session?.angemeldet) return next();
   res.status(401).json({ error: 'Nicht angemeldet' });
 });
@@ -150,21 +151,21 @@ const PUBLIC_DIR = process.pkg
   : path.join(__dirname, 'public');
 
 // Portal-Token abfangen bevor statische Dateien
-async function handlePortalToken(req, res, next, redirectTo) {
+app.get('/', async (req, res, next) => {
   const token = req.query.portal_token;
-  if (!token) return next();
+  if (!token) {
+    if (!req.session?.portalUser) return res.redirect(`http://${req.hostname}:${PORTAL_PORT}/`);
+    return next();
+  }
   try {
     const user = await validierePortalToken(token);
     req.session.angemeldet = true;
     req.session.portalUser = { name: user.name };
-    res.redirect(redirectTo);
+    res.redirect('/');
   } catch {
-    res.redirect(redirectTo);
+    res.redirect('/');
   }
-}
-
-app.get('/', (req, res, next) => handlePortalToken(req, res, next, '/'));
-app.get('/etiketten.html', (req, res, next) => handlePortalToken(req, res, next, '/etiketten.html'));
+});
 
 app.use(express.static(PUBLIC_DIR));
 
@@ -532,6 +533,13 @@ app.get('/api/palettenlieferungen', (req, res) => {
     const result = lieferungen.map(l => ({ ...l, lieferantName: map[l.lieferant] || l.lieferant }));
     res.json({ lieferungen: result });
   } catch { res.status(500).json({ error: 'Fehler beim Lesen' }); }
+});
+
+app.get('/api/lieferanten', (req, res) => {
+  try {
+    const alle = JSON.parse(fs.readFileSync(PALETTEN_LIEFERANT_FILE, 'utf8'));
+    res.json(alle.filter(l => l.name));
+  } catch { res.json([]); }
 });
 
 // Statistik
