@@ -88,6 +88,7 @@ app.use('/api', (req, res, next) => {
   if (req.path === '/login') return next();
   if (req.path.startsWith('/portal/')) return next();
   if (req.path.startsWith('/etiketten')) return next(); // Vertrieb: kein Login nötig
+  if (req.path === '/lagerbestand/upload') return next(); // BAT-Skript: kein Login nötig
   if (req.session?.angemeldet) return next();
   res.status(401).json({ error: 'Nicht angemeldet' });
 });
@@ -128,9 +129,12 @@ function speichereDB(db) {
 let db = ladeDB();
 
 // ── Portal-Token Login ──────────────────────────────────────
+const PORTAL_PORT = process.env.PORTAL_PORT || 4003;
+const ETIKETTEN_PORT = process.env.ETIKETTEN_PORT || 3004;
+
 function validierePortalToken(token) {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:3003/api/app-token/${token}`, res => {
+    http.get(`http://localhost:${PORTAL_PORT}/api/app-token/${token}`, res => {
       let data = '';
       res.on('data', d => data += d);
       res.on('end', () => {
@@ -149,7 +153,10 @@ const PUBLIC_DIR = process.pkg
 // Portal-Token abfangen bevor statische Dateien
 app.get('/', async (req, res, next) => {
   const token = req.query.portal_token;
-  if (!token) return next();
+  if (!token) {
+    if (!req.session?.portalUser) return res.redirect(`http://${req.hostname}:${PORTAL_PORT}/`);
+    return next();
+  }
   try {
     const user = await validierePortalToken(token);
     req.session.angemeldet = true;
@@ -163,6 +170,29 @@ app.get('/', async (req, res, next) => {
 app.use(express.static(PUBLIC_DIR));
 
 // ── API ────────────────────────────────────────────────────
+app.get('/api/config', (req, res) => res.json({ portalPort: PORTAL_PORT }));
+
+// Proxy: Etikettenauftrag an etiketten-bestellen weiterleiten
+app.post('/api/etikett-auftrag', (req, res) => {
+  const payload = JSON.stringify(req.body);
+  const options = {
+    hostname: 'localhost', port: ETIKETTEN_PORT, path: '/api/auftraege/intern',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+  };
+  const r = http.request(options, r2 => {
+    let data = '';
+    r2.on('data', d => data += d);
+    r2.on('end', () => {
+      if (r2.statusCode === 200) res.json(JSON.parse(data));
+      else res.status(r2.statusCode).json({ error: 'Fehler bei Etiketten-App' });
+    });
+  });
+  r.on('error', () => res.status(500).json({ error: 'Etiketten-App nicht erreichbar' }));
+  r.write(payload);
+  r.end();
+});
+
 // Alle Artikel
 app.get('/api/artikel', (req, res) => {
   const rang = { offen: 0, etiketten: 1, erledigt: 2 };
@@ -233,7 +263,7 @@ app.patch('/api/artikel/:id/etiketten', (req, res) => {
   const id = parseInt(req.params.id);
   const artikel = db.artikel.find(a => a.id === id);
   if (!artikel) return res.status(404).json({ error: 'Nicht gefunden' });
-  artikel.status = 'etiketten';
+  artikel.etiketten_bestellt = true;
   artikel.etiketten_menge = (req.body.menge || '').toString().trim();
   speichereDB(db);
   io.emit('artikel_etiketten', artikel);
@@ -354,6 +384,33 @@ setInterval(ladeBestand, 5 * 60 * 1000);
 
 app.get('/api/lagerbestand', (req, res) => res.json(bestandMap));
 
+app.get('/api/lagerorte-extra', (req, res) => {
+  try {
+    const reservelagerFile = path.join(__dirname, '..', 'artikel-lagerorte', 'reservelager.csv');
+    const palettenFile     = path.join(__dirname, '..', 'artikel-lagerorte', 'paletten-data.json');
+    const result = {};
+
+    if (fs.existsSync(reservelagerFile)) {
+      fs.readFileSync(reservelagerFile, 'utf8').split('\n').slice(1).forEach(line => {
+        const [nr, wert] = line.split(';').map(s => s.trim());
+        if (nr && wert) { if (!result[nr]) result[nr] = {}; result[nr].reservelager = wert; }
+      });
+    }
+    if (fs.existsSync(palettenFile)) {
+      const pd = JSON.parse(fs.readFileSync(palettenFile, 'utf8'));
+      Object.entries(pd).forEach(([nr, eintraege]) => {
+        if (!Array.isArray(eintraege) || eintraege.length === 0) return;
+        if (!result[nr]) result[nr] = {};
+        result[nr].stellplaetze = eintraege.filter(e => e.stellplatz).map(e => ({ stellplatz: e.stellplatz, menge: e.menge || 0 }));
+      });
+    }
+    res.json(result);
+  } catch (e) {
+    res.json({});
+  }
+});
+
+
 app.post('/api/lagerbestand/upload', (req, res) => {
   const chunks = [];
   req.on('data', c => chunks.push(c));
@@ -446,6 +503,15 @@ app.patch('/api/etiketten/:id/erledigt', (req, res) => {
   res.json(eintrag);
 });
 
+app.patch('/api/etiketten/:id/abschliessen', (req, res) => {
+  const id = parseInt(req.params.id);
+  const eintrag = etikettenDB.eintraege.find(e => e.id === id);
+  if (!eintrag) return res.status(404).json({ error: 'Nicht gefunden' });
+  eintrag.abgeschlossen = true;
+  speichereEtikettenDB(etikettenDB);
+  res.json(eintrag);
+});
+
 app.delete('/api/etiketten/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const idx = etikettenDB.eintraege.findIndex(e => e.id === id);
@@ -454,6 +520,26 @@ app.delete('/api/etiketten/:id', (req, res) => {
   speichereEtikettenDB(etikettenDB);
   io.emit('etikett_geloescht', { id });
   res.json({ ok: true });
+});
+
+// Palettenlieferungen
+const PALETTEN_LIEF_FILE      = path.join(__dirname, '..', 'palettenlieferungen', 'lieferungen.json');
+const PALETTEN_LIEFERANT_FILE = path.join(__dirname, '..', 'palettenlieferungen', 'lieferanten.json');
+app.get('/api/palettenlieferungen', (req, res) => {
+  try {
+    const { lieferungen } = JSON.parse(fs.readFileSync(PALETTEN_LIEF_FILE, 'utf8'));
+    const lieferanten = JSON.parse(fs.readFileSync(PALETTEN_LIEFERANT_FILE, 'utf8'));
+    const map = Object.fromEntries(lieferanten.map(l => [l.kuerzel, l.name]));
+    const result = lieferungen.map(l => ({ ...l, lieferantName: map[l.lieferant] || l.lieferant }));
+    res.json({ lieferungen: result });
+  } catch { res.status(500).json({ error: 'Fehler beim Lesen' }); }
+});
+
+app.get('/api/lieferanten', (req, res) => {
+  try {
+    const alle = JSON.parse(fs.readFileSync(PALETTEN_LIEFERANT_FILE, 'utf8'));
+    res.json(alle.filter(l => l.name));
+  } catch { res.json([]); }
 });
 
 // Statistik
