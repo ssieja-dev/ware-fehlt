@@ -1,0 +1,19 @@
+{
+  "users": [
+    {
+      "name": "Admin",
+      "passwort": "admin123",
+      "apps": ["ware-fehlt", "etiketten", "reklamationen", "inventur"]
+    },
+    {
+      "name": "Lager",
+      "passwort": "lager123",
+      "apps": ["ware-fehlt", "inventur"]
+    },
+    {
+      "name": "Vertrieb",
+      "passwort": "vertrieb123",
+      "apps": ["etiketten", "reklamationen"]
+    }
+  ]
+}
