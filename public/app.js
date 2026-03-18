@@ -178,6 +178,59 @@ function sucheEtLieferung() {
   document.getElementById('etiketten-lieferung').value = info;
 }
 
+// ── KATALOG UPLOAD ───────────────────────────────────────────
+function oeffneKatalogUpload() {
+  document.getElementById('katalog-file-input').value = '';
+  document.getElementById('katalog-datei-name').textContent = 'Datei auswählen (.csv)';
+  document.getElementById('katalog-upload-status').textContent = '';
+  const btn = document.getElementById('katalog-upload-btn');
+  btn.disabled = true; btn.style.opacity = '.5';
+  document.getElementById('katalog-upload-modal').classList.remove('hidden');
+}
+
+function schliesseKatalogUpload() {
+  document.getElementById('katalog-upload-modal').classList.add('hidden');
+}
+
+function katalogDateiGewaehlt(input) {
+  const file = input.files[0];
+  const btn = document.getElementById('katalog-upload-btn');
+  document.getElementById('katalog-datei-name').textContent = file ? file.name : 'Datei auswählen (.csv)';
+  btn.disabled = !file; btn.style.opacity = file ? '1' : '.5';
+  document.getElementById('katalog-upload-status').textContent = '';
+}
+
+async function uploadKatalog() {
+  const input = document.getElementById('katalog-file-input');
+  const status = document.getElementById('katalog-upload-status');
+  const btn = document.getElementById('katalog-upload-btn');
+  if (!input.files[0]) return;
+  btn.disabled = true; btn.style.opacity = '.5';
+  status.style.color = 'var(--text2)';
+  status.textContent = 'Wird hochgeladen...';
+  try {
+    const res = await fetch('/api/katalog/upload', {
+      method: 'POST',
+      body: input.files[0],
+      headers: { 'Content-Type': 'application/octet-stream' },
+    });
+    const data = await res.json();
+    if (data.ok) {
+      schliesseKatalogUpload();
+      await ladeKatalog();
+      toast(`Katalog aktualisiert: ${data.artikel} Artikel`, 'success');
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = 'Fehler: ' + (data.error || 'Unbekannt');
+      btn.disabled = false; btn.style.opacity = '1';
+    }
+  } catch {
+    status.style.color = '#ef4444';
+    status.textContent = 'Verbindungsfehler';
+    btn.disabled = false; btn.style.opacity = '1';
+  }
+}
+
 // ── KATALOG ──────────────────────────────────────────────────
 async function ladeLagerbestand() {
   try {
@@ -312,6 +365,9 @@ async function pruefSession() {
       if (portalUser?.name) {
         userName = portalUser.name;
         localStorage.setItem('lager_username', userName);
+      }
+      if (portalUser?.admin) {
+        document.getElementById('katalog-upload-btn-header').classList.remove('hidden');
       }
     }
   } catch {}

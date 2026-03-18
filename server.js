@@ -63,8 +63,8 @@ app.post('/api/portal/login', (req, res) => {
   );
   if (user) {
     req.session.angemeldet = true;
-    req.session.portalUser = { name: user.name, apps: user.apps || [] };
-    res.json({ name: user.name, apps: user.apps || [] });
+    req.session.portalUser = { name: user.name, apps: user.apps || [], admin: !!user.admin };
+    res.json({ name: user.name, apps: user.apps || [], admin: !!user.admin });
   } else {
     res.status(401).json({ error: 'Falsche Zugangsdaten' });
   }
@@ -160,7 +160,7 @@ app.get('/', async (req, res, next) => {
   try {
     const user = await validierePortalToken(token);
     req.session.angemeldet = true;
-    req.session.portalUser = { name: user.name };
+    req.session.portalUser = { name: user.name, admin: !!user.admin };
     res.redirect('/');
   } catch {
     res.redirect('/');
@@ -348,6 +348,26 @@ app.get('/api/katalog', (req, res) => {
   } catch {
     res.json([]);
   }
+});
+
+app.post('/api/katalog/upload', (req, res) => {
+  if (!req.session?.portalUser?.admin) return res.status(403).json({ error: 'Kein Zugriff' });
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    try {
+      const buf = Buffer.concat(chunks);
+      if (fs.existsSync(KATALOG_FILE)) {
+        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        fs.copyFileSync(KATALOG_FILE, KATALOG_FILE + '.bak_' + today);
+      }
+      fs.writeFileSync(KATALOG_FILE, buf);
+      const eintraege = parseCSV(buf.toString('latin1'));
+      res.json({ ok: true, artikel: eintraege.length });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
 });
 
 // Lagerbestand aus JTL-CSV
