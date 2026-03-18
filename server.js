@@ -503,6 +503,18 @@ app.patch('/api/etiketten/:id/erledigt', (req, res) => {
   res.json(eintrag);
 });
 
+app.patch('/api/etiketten/:id/menge', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const id = parseInt(req.params.id);
+  const { menge } = req.body;
+  const eintrag = etikettenDB.eintraege.find(e => e.id === id);
+  if (!eintrag) return res.status(404).json({ error: 'Nicht gefunden' });
+  eintrag.menge = (menge || '').toString().trim();
+  speichereEtikettenDB(etikettenDB);
+  io.emit('etikett_menge', { id, menge: eintrag.menge });
+  res.json(eintrag);
+});
+
 app.patch('/api/etiketten/:id/abschliessen', (req, res) => {
   const id = parseInt(req.params.id);
   const eintrag = etikettenDB.eintraege.find(e => e.id === id);

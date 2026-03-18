@@ -131,12 +131,7 @@ header {
 .header-controls-row {
   display: flex; align-items: center; justify-content: space-between; gap: .5rem;
 }
-.portal-back-btn {
-  display: flex; align-items: center; gap: .35rem;
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-  padding: .4rem .8rem; color: var(--text2); font-size: .82rem;
-  text-decoration: none; transition: color .15s, border-color .15s; flex-shrink: 0;
-}
+
 .header-logo { height: 52px; width: auto; max-width: 200px; display: block; object-fit: contain; }
 .header-right { display: flex; align-items: center; gap: .6rem; }
 
@@ -348,6 +343,19 @@ main {
   transition: background .15s;
   animation: fadeIn .2s ease;
 }
+.top-chips {
+  display: flex; flex-direction: column; gap: .4rem;
+  align-self: flex-start; flex-shrink: 0;
+}
+.lagerort-chip {
+  display: flex; flex-direction: column; justify-content: center;
+  background: #2d1f4a; border: 1px solid #6d4faa;
+  color: #c4b5fd; border-radius: 8px;
+  padding: .52rem .82rem; font-size: 1.02rem; font-weight: 700;
+  letter-spacing: .04em; line-height: 1.3;
+  flex-shrink: 0;
+}
+.lagerort-chip .pd-chip-label { color: #a78bda; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .artikel-item:last-child { border-bottom: none; }
 .artikel-item:hover { background: rgba(0,0,0,.02); }
@@ -419,6 +427,40 @@ main {
 }
 .meta-item svg { width: 12px; height: 12px; flex-shrink: 0; }
 .meta-lagerort { color: var(--accent); font-weight: 700; font-size: .85rem; }
+
+/* ── Palettenlagerplatz Chips (wie Artikel-Lagerorte) ── */
+.wf-paletten-block { margin-top: .45rem; }
+.wf-paletten-label {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .72rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text3); margin-bottom: .35rem;
+}
+.wf-paletten-row { display: flex; align-items: flex-start; gap: .4rem; }
+.wf-paletten-chips { display: flex; flex-direction: column; gap: .4rem; align-items: flex-start; flex: 1; }
+.pd-chip {
+  display: flex; flex-direction: column; justify-content: center;
+  border-radius: 8px; padding: .45rem .75rem;
+  font-size: 1rem; font-weight: 700; line-height: 1.3;
+}
+.pd-chip-label {
+  font-size: .68rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; opacity: .7; margin-bottom: .1rem; display: block;
+}
+.pd-chip-stell {
+  background: #1a3a5c; border: 1px solid #3b6ea5;
+  color: #7ec8ff; font-size: 1.05rem; letter-spacing: .04em;
+}
+.pd-chip-stell-val { display: flex; align-items: center; gap: .4rem; }
+.pd-chip-menge-small {
+  font-size: .75rem; font-weight: 700;
+  background: #0f2a45; border: 1px solid #3b6ea5;
+  border-radius: 5px; padding: .05rem .35rem;
+  color: #93c5fd;
+}
+.pd-chip-reserve {
+  background: #1a3a5c; border: 1px solid #3b6ea5;
+  color: #7ec8ff; font-size: 1.05rem; letter-spacing: .04em;
+}
 .notiz-text {
   font-size: .8rem; color: var(--text2);
   background: rgba(59,130,246,.07);
@@ -559,20 +601,30 @@ main {
 }
 .anmerkung-badge svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: .15rem; stroke: #c4b5fd; }
 
+/* ── JAHRESBUTTONS (Etiketten-Modal) ── */
+.year-btns { display: flex; gap: .5rem; margin-bottom: .6rem; }
+.year-btn {
+  flex: 1; padding: .4rem; border: 1px solid var(--border2);
+  border-radius: 6px; background: var(--bg3); color: var(--text2);
+  font-size: .85rem; font-weight: 500; cursor: pointer; transition: all .15s;
+}
+.year-btn.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  font-weight: 600;
+}
+
 /* ── ETIKETTEN-TOGGLE ── */
 .et-toggle {
   display: flex; gap: .4rem; margin: .75rem 0 .4rem;
-  background: var(--bg3); border-radius: var(--radius-sm);
-  padding: .25rem;
 }
 .et-toggle-btn {
-  flex: 1; padding: .45rem .5rem; border: none; border-radius: 6px;
-  font-size: .85rem; font-weight: 500; cursor: pointer;
-  background: transparent; color: var(--text2); transition: all .15s;
+  flex: 1; padding: .55rem .5rem; border-radius: 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); font-size: .82rem; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: all .15s;
 }
 .et-toggle-btn.active {
-  background: var(--green); color: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15); font-weight: 600;
+  background: rgba(59,130,246,.2); border-color: var(--accent); color: var(--accent);
 }
 .et-feld input { width: 100%; }
 .et-feld.hidden { display: none; }
@@ -580,20 +632,20 @@ main {
 /* ── MENGEN-STEPPER ── */
 .mengen-stepper {
   display: flex; align-items: center; justify-content: center;
-  gap: .6rem; margin: .5rem 0;
+  gap: .5rem; margin: .5rem 0;
 }
 .stepper-btn {
-  width: 52px; height: 52px; border-radius: 50%;
-  border: 2px solid var(--border2); background: var(--bg3);
-  font-size: 1.6rem; font-weight: 300; color: var(--text);
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all .15s; user-select: none;
+  width: 52px; height: 52px; border-radius: 12px;
+  background: #14532d; border: 1px solid #16a34a;
+  color: #4ade80; font-size: 1.9rem; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s; flex-shrink: 0;
+  user-select: none;
 }
-.stepper-btn:active { transform: scale(.9); background: var(--border); }
+.stepper-btn:active { background: var(--border); }
 .stepper-wert {
-  min-width: 64px; text-align: center;
-  font-size: 2.4rem; font-weight: 700; color: var(--text);
-  line-height: 1;
+  font-size: 1.6rem; font-weight: 700; min-width: 40px; text-align: center;
+  color: var(--text);
 }
 .stepper-confirm {
   width: 52px; height: 52px; border-radius: 50%;
@@ -678,6 +730,30 @@ input:-webkit-autofill {
   -webkit-text-fill-color: var(--text);
 }
 
+/* ── ETIKETTEN-MODAL BOX ── */
+#etiketten-modal .modal-box {
+  max-width: 360px;
+  border-radius: 20px;
+  padding: 2rem 1.75rem;
+  box-shadow: 0 24px 64px rgba(0,0,0,.5);
+  text-align: left;
+}
+#etiketten-modal .modal-box h2 { text-align: center; }
+#etiketten-modal .btn-submit {
+  border-radius: 10px;
+  padding: .85rem;
+  transition: opacity .2s;
+}
+#etiketten-modal .btn-submit:active { opacity: .85; transform: none; }
+#etiketten-modal .stepper-btn {
+  width: 52px; height: 52px; font-size: 1.9rem; border-radius: 12px;
+  background: #14532d; border: 1px solid #16a34a; color: #4ade80;
+}
+#etiketten-modal .stepper-wert {
+  font-size: 1.6rem; min-width: 40px;
+}
+#etiketten-modal .mengen-stepper { gap: .5rem; }
+
 /* ── BESTAND-HINT IM FORMULAR ── */
 .bestand-hint {
   margin-top: 4px;
@@ -742,8 +818,15 @@ input:-webkit-autofill {
   border-radius: 4px; pointer-events: none; z-index: 1;
 }
 .lieferung-preview {
-  background: var(--bg2, #0f172a); border: 1px solid var(--border, #1e293b);
-  border-radius: 8px; padding: .4rem .7rem;
-  font-size: .95rem; font-weight: 700; color: var(--text, #f1f5f9);
-  font-family: monospace; letter-spacing: .04em; text-align: center;
+  background: rgba(167,139,250,.12); border: 1px solid rgba(167,139,250,.4);
+  border-radius: 8px; padding: .6rem .85rem;
+  font-size: .95rem; font-weight: 600; color: #c4b5fd;
+  font-family: inherit; letter-spacing: .01em; text-align: center;
 }
+.portal-back-btn {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--accent); border: 1px solid var(--accent); border-radius: 8px;
+  padding: .5rem 1.1rem; color: #fff; font-size: .9rem; font-weight: 600;
+  text-decoration: none; transition: background .15s; flex-shrink: 0;
+}
+.portal-back-btn:hover { background: #2563eb; border-color: #2563eb; }

@@ -54,13 +54,13 @@
       display: flex; align-items: center; justify-content: center; gap: .6rem; margin: .5rem 0;
     }
     .stepper-btn {
-      width: 52px; height: 52px; border-radius: 50%;
-      border: 2px solid var(--border2); background: var(--bg3);
-      font-size: 1.6rem; font-weight: 300; color: var(--text);
+      width: 52px; height: 52px; border-radius: 12px;
+      background: #14532d; border: 1px solid #16a34a;
+      color: #4ade80; font-size: 1.9rem; font-weight: 600;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: all .15s; user-select: none;
+      transition: background .15s; user-select: none;
     }
-    .stepper-btn:active { transform: scale(.9); background: var(--border); }
+    .stepper-btn:active { background: #166534; }
     .stepper-wert {
       min-width: 64px; text-align: center;
       font-size: 2.4rem; font-weight: 700; color: var(--text); line-height: 1;
@@ -140,6 +140,10 @@
           <div class="connection-status" id="conn-status">
             <span class="dot"></span>
             <span class="conn-label">Verbinde...</span>
+          </div>
+          <div class="current-user" id="current-user-display">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="current-user-name">-</span>
           </div>
         </div>
       </div>

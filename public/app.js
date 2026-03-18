@@ -4,6 +4,7 @@ const socket = io();
 let alleArtikel = [];
 let katalog = [];
 let lagerbestand = {};
+let lagerorteExtra = {};
 let aktuellerFilter = 'offen';
 let pendingErledigtId = null;
 let userName = localStorage.getItem('lager_username') || '';
@@ -12,7 +13,11 @@ let userName = localStorage.getItem('lager_username') || '';
 window.addEventListener('DOMContentLoaded', () => {
   pruefSession();
   const backBtn = document.getElementById('portal-back-btn');
-  if (backBtn) backBtn.href = `http://${window.location.hostname}:3003`;
+  if (backBtn) {
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+      backBtn.href = `http://${window.location.hostname}:${cfg.portalPort}`;
+    });
+  }
 
   // Enter-Taste im Login-Modal
   document.getElementById('user-name-input').addEventListener('keydown', e => {
@@ -47,6 +52,9 @@ window.addEventListener('DOMContentLoaded', () => {
       if (e.key === 'Enter') submitArtikel();
     });
   });
+
+  setupEtStepper('et-stepper-minus', -1);
+  setupEtStepper('et-stepper-plus', 1);
 });
 
 // ── DRUM PICKER ──────────────────────────────────────────────
@@ -104,16 +112,7 @@ function initDrumPicker(id, items, onChange) {
   return { reset: () => snap(0, true), getValue: () => items[idx] };
 }
 
-let etNumPicker = null;
-let etLetterPicker = null;
-
-function initEtPickers() {
-  if (etNumPicker) return; // already initialized
-  const numItems    = Array.from({ length: 101 }, (_, i) => String(200 + i));
-  const letterItems = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  etNumPicker    = initDrumPicker('et-picker-nummer',    numItems,    () => updateEtLieferungPreview());
-  etLetterPicker = initDrumPicker('et-picker-lieferant', letterItems, () => updateEtLieferungPreview());
-}
+let allePalettenLieferungen = [];
 
 function getKW(dateStr) {
   const d = new Date(dateStr);
@@ -123,29 +122,60 @@ function getKW(dateStr) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
-function updateEtLieferungPreview() {
-  const datumStr = document.getElementById('et-lieferung-datum').value;
-  const kw = datumStr ? getKW(datumStr) : null;
-  document.getElementById('et-kw-badge').textContent = kw ? `${kw} KW` : '– KW';
+async function ladeLieferanten() {
+  try {
+    const res = await fetch('/api/lieferanten');
+    if (!res.ok) return;
+    const liste = (await res.json()).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    const sel = document.getElementById('et-ld-lieferant');
+    liste.forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.kuerzel;
+      opt.textContent = `${l.kuerzel} · ${l.name}`;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
 
-  let datumFormatted = '';
-  if (datumStr) {
-    const [y, m, d] = datumStr.split('-');
-    datumFormatted = `${d}.${m}.${y}`;
+async function ladePalettenLieferungen() {
+  try {
+    const r = await fetch('/api/palettenlieferungen');
+    if (!r.ok) return;
+    const data = await r.json();
+    allePalettenLieferungen = data.lieferungen || [];
+  } catch {}
+}
+
+function sucheEtLieferung() {
+  const nr = parseInt(document.getElementById('et-lief-nr').value);
+  const badge = document.getElementById('et-lief-badge');
+  const preview = document.getElementById('et-lieferung-preview');
+
+  if (!nr) {
+    badge.textContent = '–'; badge.style.opacity = '.4'; badge.style.color = '';
+    preview.textContent = '–';
+    document.getElementById('etiketten-lieferung').value = '';
+    return;
   }
 
-  const num    = etNumPicker    ? etNumPicker.getValue()    : '';
-  const letter = etLetterPicker ? etLetterPicker.getValue() : '';
+  const l = allePalettenLieferungen.find(x => x.id === nr);
+  if (!l) {
+    badge.textContent = 'Nicht gefunden'; badge.style.opacity = '1'; badge.style.color = '#f87171';
+    preview.textContent = '–';
+    document.getElementById('etiketten-lieferung').value = '';
+    return;
+  }
 
-  const parts = [];
-  if (kw)             parts.push(`${kw}KW`);
-  if (datumFormatted) parts.push(datumFormatted);
-  if (num)            parts.push(num);
-  if (letter)         parts.push(letter);
+  const [y, m, d] = l.datum.split('-');
+  const datumFormatted = `${d}.${m}.${y}`;
+  const info = `${l.kw}KW ${datumFormatted} ${l.id} ${l.lieferant}`;
 
-  const val = parts.join(' ');
-  document.getElementById('et-lieferung-preview').textContent = val || '–';
-  document.getElementById('etiketten-lieferung').value = val;
+  badge.textContent = `KW ${l.kw}`; badge.style.opacity = '1'; badge.style.color = '';
+  const lieferantAnzeige = l.lieferantName && l.lieferantName !== l.lieferant
+    ? `${escHtml(l.lieferantName)} | ${escHtml(l.lieferant)}`
+    : escHtml(l.lieferant);
+  preview.textContent = `${l.id} · KW ${l.kw} · ${datumFormatted} · ${lieferantAnzeige}`;
+  document.getElementById('etiketten-lieferung').value = info;
 }
 
 // ── KATALOG ──────────────────────────────────────────────────
@@ -153,6 +183,14 @@ async function ladeLagerbestand() {
   try {
     const res = await fetch('/api/lagerbestand');
     lagerbestand = await res.json();
+    renderListe();
+  } catch {}
+}
+
+async function ladeLagerorteExtra() {
+  try {
+    const res = await fetch('/api/lagerorte-extra');
+    lagerorteExtra = await res.json();
     renderListe();
   } catch {}
 }
@@ -291,6 +329,9 @@ async function pruefSession() {
       ladeStatistik();
       ladeKatalog();
       ladeLagerbestand();
+      ladePalettenLieferungen();
+      ladeLieferanten();
+      ladeLagerorteExtra();
       ladeEtikettenFertig();
       updateUserDisplay();
     }
@@ -335,6 +376,7 @@ async function setUserName() {
   ladeStatistik();
   ladeKatalog();
   ladeLagerbestand();
+  ladeLagerorteExtra();
   ladeEtikettenFertig();
 }
 
@@ -682,26 +724,37 @@ function spieleEtikettenFertigTon() {
 
 // ── ETIKETTEN ────────────────────────────────────────────────
 let pendingEtikettenArtikel = null;
+let etAuftragTyp = 'lieferung';
+let etAuftragGroesse = null;
 
 let stepperWert = 1;
-let stepperInterval = null;
 
 function stepperAendern(delta) {
   stepperWert = Math.max(1, stepperWert + delta);
   document.getElementById('etiketten-menge-display').textContent = stepperWert;
 }
 
-function stepperStart(delta) {
-  stepperAendern(delta);
-  stepperInterval = setTimeout(() => {
-    stepperInterval = setInterval(() => stepperAendern(delta * 10), 100);
-  }, 500);
-}
-
-function stepperStop() {
-  clearTimeout(stepperInterval);
-  clearInterval(stepperInterval);
-  stepperInterval = null;
+function setupEtStepper(btnId, dir) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  let holdTimer = null, repeatTimer = null;
+  function start() {
+    stepperAendern(dir);
+    holdTimer = setTimeout(() => {
+      btn.classList.add('longpress');
+      repeatTimer = setInterval(() => stepperAendern(dir * 10), 150);
+    }, 600);
+  }
+  function stop() {
+    clearTimeout(holdTimer); clearInterval(repeatTimer);
+    btn.classList.remove('longpress');
+  }
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); start(); }, { passive: false });
+  btn.addEventListener('mouseup', stop);
+  btn.addEventListener('mouseleave', stop);
+  btn.addEventListener('touchend', stop);
+  btn.addEventListener('touchcancel', stop);
 }
 
 function openEtikettenModal(id) {
@@ -712,21 +765,78 @@ function openEtikettenModal(id) {
     `${escHtml(a2.artikelname)}${a2.artikelnummer ? '<br><span style="font-size:.85rem;color:#6b7280;font-weight:400;">' + escHtml(a2.artikelnummer) + '</span>' : ''}`;
   stepperWert = 1;
   document.getElementById('etiketten-menge-display').textContent = 1;
-  setEtikettenTyp('lieferung');
-  initEtPickers();
-  if (etNumPicker)    etNumPicker.reset();
-  if (etLetterPicker) etLetterPicker.reset();
-  document.getElementById('et-lieferung-datum').value = new Date().toISOString().slice(0, 10);
-  updateEtLieferungPreview();
+  etAuftragGroesse = null;
+  setEtAuftragTyp('lieferung');
+  setEtAuftragGroesse(null);
+  document.getElementById('et-lief-nr').value = '';
+  document.getElementById('et-lief-badge').textContent = '–';
+  document.getElementById('et-lief-badge').style.opacity = '.4';
+  document.getElementById('et-lief-badge').style.color = '';
+  document.getElementById('et-lieferung-preview').textContent = '–';
+  document.getElementById('etiketten-lieferung').value = '';
+  document.getElementById('et-ld-datum').value = '';
+  document.getElementById('et-ld').value = '';
+  document.getElementById('et-ld-badge').textContent = 'kein Datum';
+  document.getElementById('et-ld-badge').style.opacity = '.4';
+  document.getElementById('et-ld-lieferant').value = '';
+  [2026, 2027, 2028].forEach(j => document.getElementById(`et-year-btn-${j}`)?.classList.remove('active'));
   document.getElementById('etiketten-modal').classList.remove('hidden');
 }
 
-let etikettenTyp = 'lieferung';
-function setEtikettenTyp(typ) {
-  etikettenTyp = typ;
-  document.getElementById('toggle-lieferung').classList.toggle('active', typ === 'lieferung');
-  document.getElementById('toggle-mhd').classList.toggle('active', typ === 'mhd');
+function setEtAuftragTyp(typ) {
+  etAuftragTyp = typ;
+  document.getElementById('et-toggle-lieferung').classList.toggle('active', typ === 'lieferung');
+  document.getElementById('et-toggle-mhd').classList.toggle('active', typ === 'mhd');
+  document.getElementById('et-toggle-ld').classList.toggle('active', typ === 'lieferung-datum');
   document.getElementById('et-feld-lieferung').classList.toggle('hidden', typ !== 'lieferung');
+  document.getElementById('et-feld-ld').classList.toggle('hidden', typ !== 'lieferung-datum');
+}
+
+function setEtAuftragGroesse(groesse) {
+  etAuftragGroesse = groesse;
+  document.getElementById('et-toggle-klein').classList.toggle('active', groesse === 'klein');
+  document.getElementById('et-toggle-gross').classList.toggle('active', groesse === 'gross');
+}
+
+function setEtLDJahr(jahr) {
+  const cur = document.getElementById('et-ld-datum').value;
+  let m, d;
+  if (cur) {
+    [, m, d] = cur.split('-');
+  } else {
+    const heute = new Date();
+    let monat = heute.getMonth() + 1 - 2;
+    if (monat <= 0) monat += 12;
+    m = String(monat).padStart(2, '0');
+    d = String(heute.getDate()).padStart(2, '0');
+  }
+  document.getElementById('et-ld-datum').value = `${jahr}-${m}-${d}`;
+  [2026, 2027, 2028].forEach(j => document.getElementById(`et-year-btn-${j}`).classList.toggle('active', j === jahr));
+  updateEtLDPreview();
+}
+
+function updateEtLDPreview() {
+  const val = document.getElementById('et-ld-datum').value;
+  const badge = document.getElementById('et-ld-badge');
+  const lieferantSel = document.getElementById('et-ld-lieferant');
+  const lieferantText = lieferantSel && lieferantSel.selectedIndex > 0
+    ? lieferantSel.options[lieferantSel.selectedIndex].textContent : '';
+  if (val) {
+    const [y, m, d] = val.split('-');
+    const formatted = `${d}.${m}.${y}`;
+    const kw = getKW(val);
+    const kwText = `KW${kw}`;
+    badge.textContent = lieferantText ? `${kwText} ${formatted} · ${lieferantText}` : `${kwText} ${formatted}`;
+    badge.style.opacity = '1';
+    document.getElementById('et-ld').value = lieferantText ? `${kwText} ${formatted} | ${lieferantText}` : `${kwText} ${formatted}`;
+    const jahr = parseInt(y);
+    [2026, 2027, 2028].forEach(j => document.getElementById(`et-year-btn-${j}`).classList.toggle('active', j === jahr));
+  } else {
+    badge.textContent = 'kein Datum';
+    badge.style.opacity = '.4';
+    document.getElementById('et-ld').value = '';
+    [2026, 2027, 2028].forEach(j => document.getElementById(`et-year-btn-${j}`).classList.remove('active'));
+  }
 }
 
 function closeEtikettenModal() {
@@ -734,11 +844,30 @@ function closeEtikettenModal() {
   document.getElementById('etiketten-modal').classList.add('hidden');
 }
 
-async function bestaetigeEtiketten() {
-  const menge = String(stepperWert);
+async function bestaetigeEtikettenAuftrag() {
   const a = pendingEtikettenArtikel;
+  if (!etAuftragGroesse) {
+    shake(document.getElementById('et-toggle-klein'));
+    toast('Bitte Größe wählen', 'error');
+    return;
+  }
+  const info = etAuftragTyp === 'lieferung'
+    ? document.getElementById('etiketten-lieferung').value.trim()
+    : etAuftragTyp === 'lieferung-datum'
+    ? document.getElementById('et-ld').value.trim()
+    : '';
+  if (etAuftragTyp === 'lieferung' && !info) {
+    shake(document.getElementById('et-lief-nr'));
+    toast('Bitte gültige Lieferungsnummer eingeben', 'error');
+    return;
+  }
+  if (etAuftragTyp === 'lieferung-datum' && !info) {
+    shake(document.getElementById('et-ld-datum'));
+    toast('Bitte Datum wählen', 'error');
+    return;
+  }
   try {
-    const res = await fetch('/api/etiketten', {
+    const res = await fetch('/api/etikett-auftrag', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -746,18 +875,19 @@ async function bestaetigeEtiketten() {
         artikelname: a.artikelname,
         artikelnummer: a.artikelnummer,
         lagerort: a.lagerort,
-        menge,
-        gemeldet_von: userName,
-        typ: etikettenTyp,
-        lieferung: etikettenTyp === 'lieferung' ? document.getElementById('etiketten-lieferung').value.trim() : '',
-        quelle: 'Ware fehlt',
+        menge: stepperWert,
+        typ: etAuftragTyp,
+        groesse: etAuftragGroesse,
+        info,
+        mhd: '',
+        bestellt_von: userName,
       }),
     });
     if (!res.ok) throw new Error();
     await fetch(`/api/artikel/${a.id}/etiketten`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ menge }),
+      body: JSON.stringify({ menge: String(stepperWert) }),
     });
     closeEtikettenModal();
     toast('Etikettenauftrag an Vertrieb gesendet', 'success');
@@ -815,7 +945,7 @@ function bestandBadge(artikelnummer) {
 
 function renderArtikelItem(a) {
   const erledigt = a.status === 'erledigt';
-  const hatEtiketten = a.status === 'etiketten';
+  const hatEtiketten = a.etiketten_bestellt === true;
   const erstelltDatum = formatDatum(a.erstellt_am);
   const erledigtDatum = a.erledigt_am ? formatDatum(a.erledigt_am) : '';
 
@@ -846,19 +976,31 @@ function renderArtikelItem(a) {
           ${!erledigt ? bestandBadge(a.artikelnummer) : ''}
         </div>
         <div class="artikel-meta">
-          <span class="meta-item meta-lagerort">${locIcon} ${escHtml(a.lagerort)}</span>
           <span class="meta-item">${userIcon} ${escHtml(a.gemeldet_von)}</span>
           <span class="meta-item">${timeIcon} ${erstelltDatum}</span>
         </div>
+        ${(() => {
+          const extra = a.artikelnummer ? lagerorteExtra[a.artikelnummer] : null;
+          if (!extra || !extra.stellplaetze?.length) return '';
+          const spChips = extra.stellplaetze.map(s => `<div class="pd-chip pd-chip-stell"><span class="pd-chip-label">Palettenplatz</span><span class="pd-chip-stell-val">${escHtml(s.stellplatz)}${s.menge ? `<span class="pd-chip-menge-small">${s.menge}K</span>` : ''}</span></div>`).join('');
+          return `<div class="wf-paletten-block">
+            <div class="wf-paletten-chips">${spChips}</div>
+          </div>`;
+        })()}
         ${a.notiz ? `<div class="notiz-text">${escHtml(a.notiz)}</div>` : ''}
-        ${(() => { const anm = getAnmerkung(a.artikelnummer); return anm ? `<div class="anmerkung-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>${formatAnmerkung(anm)}</span></div>` : ''; })()}
+
         ${hatEtiketten ? `<div class="etiketten-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Etiketten bestellt${a.etiketten_menge ? ` &mdash; <strong>${escHtml(a.etiketten_menge)} Stk.</strong>` : ''}</div>` : ''}
         ${a.etiketten_fertig ? `<div class="etiketten-fertig-info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Etiketten fertig von ${escHtml(a.etiketten_fertig_von || 'Vertrieb')}</div>` : ''}
         ${erledigt ? `<div class="erledigt-info">${checkFillIcon} Aufgefuellt von ${escHtml(a.erledigt_von)} &mdash; ${erledigtDatum}</div>` : ''}
       </div>
 
+      <div class="top-chips">
+        ${(() => { const extra = a.artikelnummer ? lagerorteExtra[a.artikelnummer] : null; return extra?.reservelager ? `<div class="pd-chip pd-chip-reserve"><span class="pd-chip-label">Reservelager</span>${escHtml(extra.reservelager)}</div>` : ''; })()}
+        <div class="lagerort-chip"><span class="pd-chip-label">Lagerort</span>${escHtml(a.lagerort)}</div>
+      </div>
+
       <div class="artikel-actions">
-        ${!erledigt && !hatEtiketten ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
+        ${!erledigt ? `<button class="action-btn etikett" title="Etiketten bestellen" onclick="openEtikettenModal(${a.id})">${etikettenIcon}</button>` : ''}
         ${erledigt ? `<button class="action-btn" title="Wieder oeffnen" onclick="markiereOffen(${a.id})">${undoIcon}</button>` : ''}
         <button class="action-btn delete" title="Loeschen" onclick="loescheArtikel(${a.id}, '${escHtml(a.artikelname).replace(/'/g,"\\'")}')">
           ${trashIcon}
