@@ -326,7 +326,7 @@ function waehlKatalogEintrag(k) {
   document.getElementById('f-nummer').value = k.artikelnummer || '';
   document.getElementById('f-artikel').value = k.artikelname + (k.artikelnummer ? ' · ' + k.artikelnummer : '');
   document.getElementById('f-artikel-clear').classList.remove('hidden');
-  document.getElementById('f-lagerort').value = k.lagerort || '';
+  document.getElementById('f-lagerort').value = k.lagerort || k['eigene id'] || '';
   zeigAnmerkung(k.anmerkung || '');
   zeigBestandInfo(k.artikelnummer || '');
   versteckeKatalogDropdown();
@@ -672,8 +672,8 @@ async function submitArtikel() {
     a.artikelnummer.toLowerCase() === nummer.toLowerCase()
   );
   if (duplikat) {
-    toast(`Bereits gemeldet: "${duplikat.artikelname}"`, 'error');
-    shake(document.getElementById('f-artikel'));
+    document.getElementById('bereits-gemeldet-text').textContent = duplikat.artikelname;
+    document.getElementById('bereits-gemeldet-modal').classList.remove('hidden');
     return;
   }
 
@@ -759,6 +759,11 @@ function loescheArtikel(id, name) {
 function closeDeleteModal() {
   pendingLoescheId = null;
   document.getElementById('delete-modal').classList.add('hidden');
+}
+
+function bereitsGemeldetSchliessen() {
+  document.getElementById('bereits-gemeldet-modal').classList.add('hidden');
+  document.getElementById('f-artikel').focus();
 }
 
 function bestandNiedrigNein() {

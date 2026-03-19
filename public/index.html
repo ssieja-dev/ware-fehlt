@@ -38,6 +38,18 @@
     </div>
   </div>
 
+  <!-- Bereits-Gemeldet-Modal -->
+  <div id="bereits-gemeldet-modal" class="modal-overlay hidden" onclick="bereitsGemeldetSchliessen()">
+    <div class="modal-box" style="text-align:center;">
+      <div class="modal-icon" style="background:#fef2f2;margin:0 auto 1rem;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h2 style="color:#ef4444;font-size:1.4rem;">Bereits gemeldet!</h2>
+      <p id="bereits-gemeldet-text" style="font-size:1.1rem;font-weight:600;color:#374151;margin:.75rem 0 1.25rem;"></p>
+      <button class="btn-secondary" onclick="bereitsGemeldetSchliessen()">OK</button>
+    </div>
+  </div>
+
   <!-- Bestand-Niedrig-Modal -->
   <div id="bestand-niedrig-modal" class="modal-overlay hidden">
     <div class="modal-box">
