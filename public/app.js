@@ -46,8 +46,20 @@ window.addEventListener('DOMContentLoaded', () => {
   fArtikelClear.addEventListener('mousedown', e => { e.preventDefault(); clearArtikel(); });
   fArtikelClear.addEventListener('touchend', e => { e.preventDefault(); clearArtikel(); });
 
-  // Form-Felder: Enter -> Submit
-  ['f-artikel','f-lagerort','f-notiz'].forEach(id => {
+  // Form-Felder: Enter -> Submit (f-artikel: zuerst GTIN-Scan prüfen)
+  fArtikel.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const val = fArtikel.value.trim();
+    const nurZiffern = s => (s || '').replace(/\D/g, '');
+    const valN = nurZiffern(val);
+    const treffer = valN.length >= 8 && (
+      katalog.find(k => { const g = nurZiffern(k.ean || k.gtin); return g && (g === valN || g === '0' + valN || '0' + g === valN); })
+    );
+    if (treffer) { waehlKatalogEintrag(treffer); toast(`Artikel gefunden: ${treffer.artikelname}`, 'success'); }
+    else submitArtikel();
+  });
+  ['f-lagerort','f-notiz'].forEach(id => {
     document.getElementById(id)?.addEventListener('keydown', e => {
       if (e.key === 'Enter') submitArtikel();
     });
@@ -1125,4 +1137,112 @@ function toast(msg, type = 'info') {
     el.style.transform = 'translateX(10px)';
     setTimeout(() => el.remove(), 300);
   }, 3500);
+}
+
+// ── EAN Scanner ──────────────────────────────────────────────────────────────
+let _scanStream = null;
+let _scanAnimFrame = null;
+let _scanDetector = null;   // BarcodeDetector
+let _scanReader = null;     // ZXing fallback
+let _scanActive = false;
+let _zxingLoaded = false;
+
+async function _ladeZXing() {
+  if (_zxingLoaded) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  _zxingLoaded = true;
+}
+
+async function oeffneScanner() {
+  if (_scanActive) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Kamera nicht verfügbar – Seite muss über HTTPS geöffnet werden', 'error');
+    return;
+  }
+  _scanActive = true;
+  const video = document.getElementById('scan-video');
+  document.getElementById('scan-overlay').style.display = 'flex';
+
+  if ('BarcodeDetector' in window) {
+    try {
+      _scanDetector = new BarcodeDetector({
+        formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e', 'code_39']
+      });
+      _scanStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      video.srcObject = _scanStream;
+      await video.play();
+      _scanSchleife();
+    } catch (e) {
+      schliesseScanner();
+      toast('Kamera konnte nicht geöffnet werden', 'error');
+    }
+  } else {
+    try {
+      await _ladeZXing();
+      _scanReader = new ZXing.BrowserMultiFormatReader();
+      await _scanReader.decodeFromConstraints(
+        { video: { facingMode: 'environment' } },
+        video,
+        (result, err) => {
+          if (!_scanActive) return;
+          if (result) _handleScanResult(result.getText());
+        }
+      );
+    } catch (e) {
+      schliesseScanner();
+      toast('Kamera konnte nicht geöffnet werden', 'error');
+    }
+  }
+}
+
+function _scanSchleife() {
+  const video = document.getElementById('scan-video');
+  if (!video || !_scanActive) return;
+  _scanDetector.detect(video).then(codes => {
+    if (!_scanActive) return;
+    if (codes.length > 0) {
+      _handleScanResult(codes[0].rawValue);
+    } else {
+      _scanAnimFrame = requestAnimationFrame(_scanSchleife);
+    }
+  }).catch(() => {
+    if (_scanActive) _scanAnimFrame = requestAnimationFrame(_scanSchleife);
+  });
+}
+
+function _handleScanResult(ean) {
+  schliesseScanner();
+  const nurZiffern = s => (s || '').replace(/\D/g, '');
+  const eanN = nurZiffern(ean);
+  
+  const matchEAN = k => {
+    const g = nurZiffern(k.ean || k.gtin);
+    return g && (g === eanN || g === '0' + eanN || '0' + g === eanN);
+  };
+  const treffer = katalog.find(matchEAN)
+    || katalog.find(k => (k.artikelnummer || '').trim() === ean.trim());
+  if (treffer) {
+    waehlKatalogEintrag(treffer);
+    toast(`Artikel gefunden: ${treffer.artikelname}`, 'success');
+  } else {
+    const input = document.getElementById('f-artikel');
+    input.value = ean;
+    input.dispatchEvent(new Event('input'));
+    toast(`EAN ${ean} – nicht im Katalog, bitte manuell wählen`, 'info');
+  }
+}
+
+function schliesseScanner() {
+  _scanActive = false;
+  cancelAnimationFrame(_scanAnimFrame);
+  if (_scanReader) { _scanReader.reset(); _scanReader = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+  document.getElementById('scan-overlay').style.display = 'none';
 }
