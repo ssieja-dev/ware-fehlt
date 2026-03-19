@@ -59,14 +59,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (treffer) {
       waehlKatalogEintrag(treffer);
       const bestand = lagerbestand[treffer.artikelnummer]?.bestand;
-      if (bestand !== undefined && bestand > 1) {
-        await submitArtikel();
-      } else if (bestand !== undefined && bestand <= 1) {
-        const b = bestand === 0 ? 'Bestand: 0' : 'Bestand: 1';
+      if (bestand !== undefined && bestand <= 1) {
+        const b = `Bestand: ${bestand}`;
         document.getElementById('bestand-niedrig-text').textContent = `${treffer.artikelname} – ${b}. Wirklich auffüllen?`;
         document.getElementById('bestand-niedrig-modal').classList.remove('hidden');
       } else {
-        toast(`Artikel gefunden: ${treffer.artikelname}`, 'success');
+        await submitArtikel();
       }
     } else {
       submitArtikel();
