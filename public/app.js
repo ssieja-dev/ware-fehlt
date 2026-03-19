@@ -47,7 +47,7 @@ window.addEventListener('DOMContentLoaded', () => {
   fArtikelClear.addEventListener('touchend', e => { e.preventDefault(); clearArtikel(); });
 
   // Form-Felder: Enter -> Submit (f-artikel: zuerst GTIN-Scan prüfen)
-  fArtikel.addEventListener('keydown', e => {
+  fArtikel.addEventListener('keydown', async e => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const val = fArtikel.value.trim();
@@ -56,8 +56,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const treffer = valN.length >= 8 && (
       katalog.find(k => { const g = nurZiffern(k.ean || k.gtin); return g && (g === valN || g === '0' + valN || '0' + g === valN); })
     );
-    if (treffer) { waehlKatalogEintrag(treffer); toast(`Artikel gefunden: ${treffer.artikelname}`, 'success'); }
-    else submitArtikel();
+    if (treffer) {
+      waehlKatalogEintrag(treffer);
+      const bestand = lagerbestand[treffer.artikelnummer]?.bestand;
+      if (bestand !== undefined && bestand > 1) {
+        await submitArtikel();
+      } else {
+        toast(`Artikel gefunden: ${treffer.artikelname}`, 'success');
+      }
+    } else {
+      submitArtikel();
+    }
   });
   ['f-lagerort','f-notiz'].forEach(id => {
     document.getElementById(id)?.addEventListener('keydown', e => {
