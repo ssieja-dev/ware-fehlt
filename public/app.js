@@ -61,6 +61,10 @@ window.addEventListener('DOMContentLoaded', () => {
       const bestand = lagerbestand[treffer.artikelnummer]?.bestand;
       if (bestand !== undefined && bestand > 1) {
         await submitArtikel();
+      } else if (bestand !== undefined && bestand <= 1) {
+        const b = bestand === 0 ? 'Bestand: 0' : 'Bestand: 1';
+        document.getElementById('bestand-niedrig-text').textContent = `${treffer.artikelname} – ${b}. Wirklich auffüllen?`;
+        document.getElementById('bestand-niedrig-modal').classList.remove('hidden');
       } else {
         toast(`Artikel gefunden: ${treffer.artikelname}`, 'success');
       }
@@ -757,6 +761,16 @@ function loescheArtikel(id, name) {
 function closeDeleteModal() {
   pendingLoescheId = null;
   document.getElementById('delete-modal').classList.add('hidden');
+}
+
+function bestandNiedrigNein() {
+  document.getElementById('bestand-niedrig-modal').classList.add('hidden');
+  document.getElementById('f-artikel').focus();
+}
+
+async function bestandNiedrigJa() {
+  document.getElementById('bestand-niedrig-modal').classList.add('hidden');
+  await submitArtikel();
 }
 
 async function bestaetigeLoeschen() {

@@ -38,6 +38,19 @@
     </div>
   </div>
 
+  <!-- Bestand-Niedrig-Modal -->
+  <div id="bestand-niedrig-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-icon" style="background:#fff7ed;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <h2>Bestand zu niedrig</h2>
+      <p id="bestand-niedrig-text" style="font-weight:600;color:#374151;"></p>
+      <button class="btn-primary" onclick="bestandNiedrigJa()">Ja, melden</button>
+      <button class="btn-secondary" onclick="bestandNiedrigNein()">Nein</button>
+    </div>
+  </div>
+
   <!-- Löschen-Modal -->
   <div id="delete-modal" class="modal-overlay hidden">
     <div class="modal-box">
@@ -127,7 +140,7 @@
         </button>
       </div>
       <p style="font-size:.85rem;color:var(--text2);margin:.25rem 0 1rem;">
-        CSV-Datei hochladen. Format: <strong>Artikelname;Artikelnummer;Lagerort</strong><br>
+        CSV-Datei hochladen. Format: <strong>Artikelname;Artikelnummer;Lagerort;GTIN</strong><br>
         Der bestehende Katalog wird ersetzt, ein Backup wird automatisch erstellt.
       </p>
       <label style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:var(--bg3);border:2px dashed var(--border2);border-radius:var(--radius-sm);cursor:pointer;">
@@ -212,8 +225,11 @@
         <div class="form-grid">
           <div class="form-group required full-width">
             <label>Artikel</label>
-            <div class="input-wrap">
+            <div class="input-wrap has-scan">
               <input type="text" id="f-artikel" placeholder="Artikelname oder Artikelnummer" maxlength="150" autocomplete="off" />
+              <button type="button" id="f-artikel-scan" class="input-scan-btn" tabindex="-1" onclick="oeffneScanner()" title="EAN scannen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="3" height="16" rx=".5"/><rect x="7" y="4" width="1.5" height="16" rx=".5"/><rect x="10.5" y="4" width="2.5" height="16" rx=".5"/><rect x="15" y="4" width="1.5" height="16" rx=".5"/><rect x="18.5" y="4" width="3.5" height="16" rx=".5"/></svg>
+              </button>
               <button type="button" id="f-artikel-clear" class="input-clear hidden" tabindex="-1">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -280,6 +296,23 @@
 
   <!-- Toast-Bereich -->
   <div id="toast-container"></div>
+
+  <!-- EAN-Scanner Overlay -->
+  <div id="scan-overlay" style="display:none;">
+    <div class="scan-header">
+      <span>EAN scannen</span>
+      <button class="scan-close-btn" onclick="schliesseScanner()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <video id="scan-video" autoplay playsinline muted></video>
+    <div class="scan-viewfinder-wrap">
+      <div class="scan-viewfinder">
+        <div class="scan-line"></div>
+      </div>
+    </div>
+    <p class="scan-hint">Halte den Barcode in den Rahmen</p>
+  </div>
 
   <script src="/socket.io.min.js"></script>
   <script src="app.js"></script>
