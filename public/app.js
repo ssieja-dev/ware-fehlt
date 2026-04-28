@@ -46,6 +46,21 @@ window.addEventListener('DOMContentLoaded', () => {
   fArtikelClear.addEventListener('mousedown', e => { e.preventDefault(); clearArtikel(); });
   fArtikelClear.addEventListener('touchend', e => { e.preventDefault(); clearArtikel(); });
 
+  const fArtikelEtikett = document.getElementById('f-artikel-etikett');
+  fArtikelEtikett.addEventListener('click', async () => {
+    const artikelname = document.getElementById('f-name').value.trim();
+    const artikelnummer = document.getElementById('f-nummer').value.trim();
+    const lagerort = document.getElementById('f-lagerort').value.trim();
+    if (!artikelname) return;
+    await fetch('/api/etiketten', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artikelname, artikelnummer, lagerort, typ: 'einlagern' }),
+    });
+    fArtikelEtikett.classList.add('hinzugefuegt');
+    setTimeout(() => fArtikelEtikett.classList.remove('hinzugefuegt'), 1500);
+  });
+
   // Form-Felder: Enter -> Submit (f-artikel: zuerst GTIN-Scan prüfen)
   fArtikel.addEventListener('keydown', async e => {
     if (e.key !== 'Enter') return;
@@ -326,6 +341,7 @@ function waehlKatalogEintrag(k) {
   document.getElementById('f-nummer').value = k.artikelnummer || '';
   document.getElementById('f-artikel').value = k.artikelname + (k.artikelnummer ? ' · ' + k.artikelnummer : '');
   document.getElementById('f-artikel-clear').classList.remove('hidden');
+  document.getElementById('f-artikel-etikett').classList.remove('hidden');
   document.getElementById('f-lagerort').value = k.lagerort || k['eigene id'] || '';
   zeigAnmerkung(k.anmerkung || '');
   zeigBestandInfo(k.artikelnummer || '');
@@ -370,6 +386,7 @@ function versteckeKatalogDropdown() {
 function clearArtikel() {
   document.getElementById('f-artikel').value = '';
   document.getElementById('f-artikel-clear').classList.add('hidden');
+  document.getElementById('f-artikel-etikett').classList.add('hidden');
   document.getElementById('f-name').value = '';
   document.getElementById('f-nummer').value = '';
   versteckeKatalogDropdown();
