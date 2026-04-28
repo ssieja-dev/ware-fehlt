@@ -53,7 +53,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const artikelnummer = document.getElementById('f-nummer').value.trim();
     const lagerort = document.getElementById('f-lagerort').value.trim();
     if (!artikelname) return;
-    await fetch('http://localhost:3005/api/etiketten', {
+    await fetch('/api/lagerorte-etiketten', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artikelname, artikelnummer, lagerort }),

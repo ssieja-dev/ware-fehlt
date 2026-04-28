@@ -172,6 +172,27 @@ app.use(express.static(PUBLIC_DIR));
 // ── API ────────────────────────────────────────────────────
 app.get('/api/config', (req, res) => res.json({ portalPort: PORTAL_PORT }));
 
+// Proxy: Etikett-Lagerort-Vormerkung an artikel-lagerorte weiterleiten
+app.post('/api/lagerorte-etiketten', (req, res) => {
+  const payload = JSON.stringify(req.body);
+  const options = {
+    hostname: 'localhost', port: 3005, path: '/api/etiketten',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+  };
+  const r = http.request(options, r2 => {
+    let data = '';
+    r2.on('data', d => data += d);
+    r2.on('end', () => {
+      if (r2.statusCode === 200 || r2.statusCode === 201) res.json(JSON.parse(data));
+      else res.status(r2.statusCode).json({ error: 'Fehler bei Artikel-Lagerorte-App' });
+    });
+  });
+  r.on('error', () => res.status(500).json({ error: 'Artikel-Lagerorte-App nicht erreichbar' }));
+  r.write(payload);
+  r.end();
+});
+
 // Proxy: Etikettenauftrag an etiketten-bestellen weiterleiten
 app.post('/api/etikett-auftrag', (req, res) => {
   const payload = JSON.stringify(req.body);
@@ -342,9 +363,15 @@ const KATALOG_FILE = process.pkg
 
 app.get('/api/katalog', (req, res) => {
   try {
-    if (!fs.existsSync(KATALOG_FILE)) return res.json([]);
-    const content = fs.readFileSync(KATALOG_FILE, 'latin1');
-    res.json(parseCSV(content));
+    if (!fs.existsSync(BESTAND_FILE)) return res.json([]);
+    const content = fs.readFileSync(BESTAND_FILE, 'latin1');
+    const rows = parseCSV(content);
+    res.json(rows.filter(r => r['artikelnummer']).map(r => ({
+      artikelname:  r['artikelname'] || '',
+      artikelnummer: r['artikelnummer'] || '',
+      lagerort:     r['eigene id'] || '',
+      gtin:         '',
+    })));
   } catch {
     res.json([]);
   }
