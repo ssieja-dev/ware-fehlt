@@ -38,6 +38,7 @@ window.addEventListener('DOMContentLoaded', () => {
   fArtikel.addEventListener('input', () => {
     document.getElementById('f-name').value = '';
     document.getElementById('f-nummer').value = '';
+    document.getElementById('f-artikel-etikett').classList.add('hidden');
     zeigKatalogDropdown(fArtikel.value.trim());
     fArtikelClear.classList.toggle('hidden', !fArtikel.value);
   });
@@ -716,6 +717,7 @@ async function submitArtikel() {
     });
     document.getElementById('f-artikel').value = '';
     document.getElementById('f-artikel-clear').classList.add('hidden');
+    document.getElementById('f-artikel-etikett').classList.add('hidden');
     zeigAnmerkung('');
     document.getElementById('bestand-info').classList.add('hidden');
     document.getElementById('f-artikel').focus();
