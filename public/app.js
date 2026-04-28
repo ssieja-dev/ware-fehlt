@@ -53,10 +53,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const artikelnummer = document.getElementById('f-nummer').value.trim();
     const lagerort = document.getElementById('f-lagerort').value.trim();
     if (!artikelname) return;
-    await fetch('/api/etiketten', {
+    await fetch('http://localhost:3005/api/etiketten', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ artikelname, artikelnummer, lagerort, typ: 'einlagern' }),
+      body: JSON.stringify({ artikelname, artikelnummer, lagerort }),
     });
     fArtikelEtikett.classList.add('hinzugefuegt');
     setTimeout(() => fArtikelEtikett.classList.remove('hinzugefuegt'), 1500);
