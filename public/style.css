@@ -177,17 +177,18 @@ header {
 
 /* ── STATS BAR ── */
 .stats-bar {
-  display: flex; gap: 0;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
+  display: flex; gap: .75rem; padding: .75rem 1rem;
+  max-width: 960px; margin: 0 auto; width: 100%;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
 }
 .stat-card {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; padding: .9rem .5rem;
-  border-right: 1px solid var(--border);
+  flex: 1; min-width: 70px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: .7rem .5rem;
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
   transition: background .2s;
 }
-.stat-card:last-child { border-right: none; }
+.stat-card:last-child { border-right: none; border-radius: 12px; }
 .stat-card:hover { background: var(--bg3); }
 .stat-num {
   font-size: 1.6rem; font-weight: 700;

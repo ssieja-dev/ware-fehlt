@@ -646,9 +646,7 @@ async function ladeStatistik() {
     const res = await fetch('/api/statistik');
     const d = await res.json();
     animateNum('stat-offen', d.offen);
-    animateNum('stat-erledigt', d.erledigt);
     animateNum('stat-etiketten', alleArtikel.filter(a => a.status === 'etiketten').length);
-    animateNum('stat-gesamt', d.gesamt);
   } catch {}
 }
 
